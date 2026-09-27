@@ -30,6 +30,9 @@ const FitnessDashboardView = {
 
     wrap.appendChild(await this.renderGoalsCard());
     wrap.appendChild(await this.renderCardioCard());
+    if (typeof StepsTracking !== 'undefined') wrap.appendChild(await StepsTracking.card(this.selectedDate));
+    if (typeof SleepTracking !== 'undefined') wrap.appendChild(await SleepTracking.card(this.selectedDate));
+    if (typeof ProgressPhotos !== 'undefined') wrap.appendChild(await ProgressPhotos.card(this.selectedDate));
 
     return wrap;
   },

@@ -1,5 +1,5 @@
 const DB_NAME = 'produktiv-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -51,6 +51,21 @@ function openDB() {
       if (!db.objectStoreNames.contains('cardioSessions')) {
         const s = db.createObjectStore('cardioSessions', { keyPath: 'id' });
         s.createIndex('date', 'date');
+      }
+      if (!db.objectStoreNames.contains('stepLogs')) {
+        const s = db.createObjectStore('stepLogs', { keyPath: 'id' });
+        s.createIndex('date', 'date');
+      }
+      if (!db.objectStoreNames.contains('sleepLogs')) {
+        const s = db.createObjectStore('sleepLogs', { keyPath: 'id' });
+        s.createIndex('date', 'date');
+      }
+      if (!db.objectStoreNames.contains('progressPhotos')) {
+        const s = db.createObjectStore('progressPhotos', { keyPath: 'id' });
+        s.createIndex('date', 'date');
+      }
+      if (!db.objectStoreNames.contains('gyms')) {
+        db.createObjectStore('gyms', { keyPath: 'id' });
       }
     };
 
@@ -119,7 +134,7 @@ const DB = {
   },
 
   async exportAll() {
-    const stores = ['tasks', 'notes', 'habits', 'habitLogs', 'focusSessions', 'settings', 'exercises', 'workouts', 'workoutSessions', 'bodyMetrics', 'goals', 'cardioSessions'];
+    const stores = ['tasks', 'notes', 'habits', 'habitLogs', 'focusSessions', 'settings', 'exercises', 'workouts', 'workoutSessions', 'bodyMetrics', 'goals', 'cardioSessions', 'stepLogs', 'sleepLogs', 'progressPhotos', 'gyms'];
     const data = {};
     for (const s of stores) {
       data[s] = await this.getAll(s);

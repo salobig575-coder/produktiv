@@ -13,10 +13,10 @@ const SettingsView = {
       },
     }, label);
 
-    const [weightRow, intensityRow, metricRow, warmRow, restRow, uniRestRow] = await Promise.all([
+    const [weightRow, intensityRow, metricRow, warmRow, restRow, uniRestRow, stepGoalRow] = await Promise.all([
       DB.get('settings', 'weightTrackingEnabled'), DB.get('settings', 'recordIntensity'), DB.get('settings', 'intensityMetric'),
       DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
-      DB.get('settings', 'unilateralRestSeconds'),
+      DB.get('settings', 'unilateralRestSeconds'), DB.get('settings', 'stepGoal'),
     ]);
     const weightEnabled = weightRow ? weightRow.value !== false : true;
     const recordIntensity = intensityRow ? !!intensityRow.value : false;
@@ -24,6 +24,10 @@ const SettingsView = {
     const trackWarmup = warmRow ? !!warmRow.value : false;
     const restSeconds = restRow ? restRow.value : 90;
     const uniRestSeconds = uniRestRow ? uniRestRow.value : 20;
+    const stepGoal = stepGoalRow ? stepGoalRow.value : 8000;
+
+    const stepGoalInput = App.el('input', { type: 'number', inputmode: 'numeric', value: stepGoal, style: 'max-width:140px' });
+    stepGoalInput.addEventListener('change', async (e) => { await DB.put('settings', { key: 'stepGoal', value: Number(e.target.value) || 8000 }); });
 
     const restSelect = App.el('select', {}, [30, 45, 60, 90, 120, 150, 180, 240].map((s) => App.el('option', { value: s }, `${s} Sekunden`)));
     restSelect.value = String(restSeconds);
@@ -64,6 +68,14 @@ const SettingsView = {
         }),
         App.el('div', { class: 'field', style: 'margin-top:10px' }, [App.el('label', {}, 'Standard-Pausenzeit'), restSelect]),
         App.el('div', { class: 'field', style: 'margin-bottom:0' }, [App.el('label', {}, 'Standard-Pausenzeit (unilateral)'), uniRestSelect, App.el('p', { class: 'tag', style: 'margin-top:4px' }, 'Pause nach der ersten Seite bei einseitigen Übungen (L/R).')]),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Cardio & Schritte']),
+        App.el('div', { class: 'field', style: 'margin-bottom:0' }, [App.el('label', {}, 'Tagesziel Schritte'), stepGoalInput]),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Fitnessstudios & Ausrüstung']),
+        App.el('button', { class: 'btn secondary', style: 'margin-bottom:0', onclick: () => Gyms.manage() }, 'Fitnessstudios verwalten'),
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.download(), style: 'width:14px;height:14px' }), 'Backup']),

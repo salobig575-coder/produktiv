@@ -44,6 +44,43 @@ const WorkoutSessionView = {
     };
   },
 
+  // Shared by start() and addExerciseToSession() so both produce identical L/R set structures.
+  buildSets(plannedSets, history, unilateral, alternating) {
+    if (!unilateral) {
+      return plannedSets.map((planned, i) => {
+        const prev = history && history[i];
+        const baseReps = prev ? prev.reps : planned.reps;
+        const baseWeight = prev ? prev.weight : planned.weight;
+        const baseRir = prev && prev.rir != null ? prev.rir : null;
+        return {
+          targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
+          reps: null, weight: null,
+          rir: null, warmup: planned.warmup || false,
+          completed: false,
+        };
+      });
+    }
+    const histL = (history || []).filter((set) => set.side === 'L');
+    const histR = (history || []).filter((set) => set.side === 'R');
+    const buildSide = (side) => plannedSets.map((planned, i) => {
+      const prev = (side === 'L' ? histL : histR)[i];
+      const baseReps = prev ? prev.reps : planned.reps;
+      const baseWeight = prev ? prev.weight : planned.weight;
+      const baseRir = prev && prev.rir != null ? prev.rir : null;
+      return {
+        side, round: i + 1,
+        targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
+        reps: null, weight: null, rir: null, warmup: planned.warmup || false,
+        completed: false,
+      };
+    });
+    const leftSets = buildSide('L');
+    const rightSets = buildSide('R');
+    return alternating
+      ? leftSets.flatMap((l, i) => [l, rightSets[i]])
+      : [...leftSets, ...rightSets];
+  },
+
   async start(workout) {
     const sessionId = DB.uid();
     const sessSettings = await this._readSettings();
@@ -52,61 +89,39 @@ const WorkoutSessionView = {
       const ex = await Exercises.byId(entry.exerciseId);
       const history = await this.lastPerformance(entry.exerciseId, sessionId);
       const unilateral = !!entry.unilateral;
-      let sets;
-      if (unilateral) {
-        const histL = (history || []).filter((set) => set.side === 'L');
-        const histR = (history || []).filter((set) => set.side === 'R');
-        sets = [];
-        entry.sets.forEach((planned, i) => {
-          for (const side of ['L', 'R']) {
-            const prev = (side === 'L' ? histL : histR)[i];
-            const baseReps = prev ? prev.reps : planned.reps;
-            const baseWeight = prev ? prev.weight : planned.weight;
-            const baseRir = prev && prev.rir != null ? prev.rir : null;
-            sets.push({
-              side, round: i + 1,
-              targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
-              reps: null, weight: null, rir: null, warmup: planned.warmup || false,
-              completed: false,
-            });
-          }
-        });
-      } else {
-        sets = entry.sets.map((planned, i) => {
-          const prev = history && history[i];
-          const baseReps = prev ? prev.reps : planned.reps;
-          const baseWeight = prev ? prev.weight : planned.weight;
-          const baseRir = prev && prev.rir != null ? prev.rir : null;
-          return {
-            targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
-            reps: null, weight: null,
-            rir: null, warmup: planned.warmup || false,
-            completed: false,
-          };
-        });
-      }
+      const alternating = entry.alternating !== false;
+      const sets = this.buildSets(entry.sets, history, unilateral, alternating);
       exercises.push({
         exerciseId: entry.exerciseId, exerciseName: ex ? ex.name : '(gelöschte Übung)',
-        restSeconds: entry.restSeconds || 90, unilateral,
+        restSeconds: entry.restSeconds || 90, unilateral, alternating,
         unilateralRestSeconds: entry.unilateralRestSeconds != null ? entry.unilateralRestSeconds : sessSettings.unilateralRestSeconds,
+        trackBodyweight: !!entry.trackBodyweight,
         sets,
       });
     }
-    this._begin(sessionId, workout.id, workout.name, exercises, workout.tag || '', sessSettings);
+    const bodyweight = await this._readBodyweight();
+    this._begin(sessionId, workout.id, workout.name, exercises, workout.tag || '', sessSettings, bodyweight);
   },
 
   async startAdhoc() {
     const sessSettings = await this._readSettings();
-    this._begin(DB.uid(), null, 'Ad-hoc-Workout', [], '', sessSettings);
+    const bodyweight = await this._readBodyweight();
+    this._begin(DB.uid(), null, 'Ad-hoc-Workout', [], '', sessSettings, bodyweight);
   },
 
-  _begin(sessionId, workoutId, workoutName, exercises, workoutTag, sessSettings) {
+  async _readBodyweight() {
+    if (typeof BodyMetrics === 'undefined') return 0;
+    const latest = await BodyMetrics.latest();
+    return latest ? latest.weight : 0;
+  },
+
+  _begin(sessionId, workoutId, workoutName, exercises, workoutTag, sessSettings, bodyweight) {
     clearInterval(this.state.intervalId);
     this.state = {
       active: true, sessionId, workoutId, workoutName, workoutTag: workoutTag || '', exercises,
       currentExerciseIndex: 0, phase: 'active', restSecondsLeft: 0, restTotal: 90,
       intervalId: setInterval(() => this.tick(), 1000),
-      startedAt: Date.now(), elapsedSeconds: 0, finishedSummary: null,
+      startedAt: Date.now(), elapsedSeconds: 0, finishedSummary: null, bodyweight: bodyweight || 0,
       settings: sessSettings || { recordIntensity: false, intensityLabel: 'RIR', trackWarmupSets: false },
     };
     App.refresh();
@@ -142,11 +157,12 @@ const WorkoutSessionView = {
     const s = this.state;
     let totalSets = 0, doneSets = 0, volume = 0, reps = 0;
     for (const ex of s.exercises) {
+      const extra = ex.trackBodyweight ? (s.bodyweight || 0) : 0;
       for (const set of ex.sets) {
         totalSets++;
         if (set.completed) {
           doneSets++;
-          if (!set.warmup) { volume += (set.reps || 0) * (set.weight || 0); reps += (set.reps || 0); }
+          if (!set.warmup) { volume += (set.reps || 0) * ((set.weight || 0) + extra); reps += (set.reps || 0); }
         }
       }
     }
@@ -169,7 +185,7 @@ const WorkoutSessionView = {
     if (this.allDone()) { await this.finish(); return; }
 
     let restSeconds = ex.restSeconds || 90;
-    if (ex.unilateral && set.side === 'L') {
+    if (ex.unilateral && ex.alternating !== false && set.side === 'L') {
       restSeconds = ex.unilateralRestSeconds != null ? ex.unilateralRestSeconds : 20;
     }
     s.phase = 'resting';
@@ -214,15 +230,16 @@ const WorkoutSessionView = {
           : null;
         listBox.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: async () => {
           const history = await this.lastPerformance(ex.id, this.state.sessionId);
-          const sets = [0, 1, 2].map((i) => {
-            const prev = history && history[i];
-            return {
-              targetReps: prev ? prev.reps : 10, targetWeight: prev ? prev.weight : 0,
-              targetRir: prev && prev.rir != null ? prev.rir : null,
-              reps: null, weight: null, rir: null, warmup: false, completed: false,
-            };
+          const unilateral = !!ex.unilateral;
+          const alternating = ex.alternating !== false;
+          const planned = [0, 1, 2].map(() => ({ reps: 10, weight: 0 }));
+          const sets = this.buildSets(planned, history, unilateral, alternating);
+          this.state.exercises.push({
+            exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, unilateral, alternating,
+            unilateralRestSeconds: this.state.settings ? this.state.settings.unilateralRestSeconds : 20,
+            trackBodyweight: !!ex.trackBodyweight,
+            sets,
           });
-          this.state.exercises.push({ exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, sets });
           this.state.currentExerciseIndex = this.state.exercises.length - 1;
           App.closeModal();
           App.refresh();
@@ -470,6 +487,12 @@ const WorkoutSessionView = {
       App.el('div', { style: 'font-size:15px;font-weight:700;opacity:.85' }, '🎉 Workout abgeschlossen'),
       App.el('div', { style: 'font-size:36px;font-weight:800;margin:8px 0' }, this.fmtTime(sum.duration)),
     ]));
+
+    if (typeof Gyms !== 'undefined') {
+      wrap.appendChild(App.el('div', { style: 'text-align:center;margin-bottom:2px' }, [
+        App.el('a', { href: '#', onclick: (e) => { e.preventDefault(); Gyms.pickForSession(this.state.sessionId); } }, 'Gym hinzufügen'),
+      ]));
+    }
 
     const mkStat = (id, label) => App.el('div', { class: 'stat' }, [
       App.el('div', { class: 'num' }, App.el('span', { id }, '0')),

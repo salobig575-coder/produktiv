@@ -268,6 +268,8 @@ const ExercisesView = {
         App.el('span', { class: 'pill' }, ex.primaryMuscle),
         ...(ex.secondaryMuscles || []).map((m) => App.el('span', { class: 'pill' }, m)),
         App.el('span', { class: 'pill' }, ex.equipment),
+        ex.unilateral ? App.el('span', { class: 'pill' }, 'Unilateral') : null,
+        ex.trackBodyweight ? App.el('span', { class: 'pill' }, 'Körpergewicht') : null,
       ]),
       ex.description && ex.description === ex.execution
         ? App.el('div', { class: 'field' }, [App.el('label', {}, 'Anleitung'), App.el('div', {}, ex.description)])
@@ -300,14 +302,43 @@ const ExercisesView = {
         : App.el('img', { src: url, style: 'width:100%;border-radius:12px;max-height:200px;object-fit:cover' }));
     });
 
+    const secondarySet = new Set();
+    const secondaryBox = App.el('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' });
+    const renderSecondary = () => {
+      secondaryBox.innerHTML = '';
+      for (const m of MUSCLE_GROUPS) {
+        secondaryBox.appendChild(App.el('span', {
+          class: 'pill' + (secondarySet.has(m) ? ' active' : ''), style: 'cursor:pointer',
+          onclick: () => { if (secondarySet.has(m)) secondarySet.delete(m); else secondarySet.add(m); renderSecondary(); },
+        }, m));
+      }
+    };
+    renderSecondary();
+
+    let unilateral = false;
+    let alternating = true;
+    let trackBodyweight = false;
+    const unilateralSlot = App.el('div');
+    const renderUnilateral = () => {
+      unilateralSlot.innerHTML = '';
+      unilateralSlot.appendChild(App.switchRow('Unilateral', 'Sätze werden pro Seite (L/R) einzeln erfasst, z.B. bei einarmigen/einbeinigen Übungen.', unilateral, (val) => { unilateral = val; renderUnilateral(); }));
+      if (unilateral) {
+        unilateralSlot.appendChild(App.switchRow('Alternierend', 'An: L1, R1, L2, R2 … Aus: erst alle linken, dann alle rechten Sätze.', alternating, (val) => { alternating = val; }));
+      }
+    };
+    renderUnilateral();
+
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Eigene Übung'),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Name'), nameInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Hauptmuskel'), muscleSelect]),
+      App.el('div', { class: 'field' }, [App.el('label', {}, 'Sekundäre Muskelgruppen'), secondaryBox]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Equipment'), equipSelect]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Beschreibung'), descInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Video-Link (optional)'), videoUrlInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Foto oder Video hochladen (optional)'), fileInput, preview]),
+      unilateralSlot,
+      App.switchRow('Körpergewicht erfassen', 'Addiert dein aktuelles Körpergewicht zum eingetragenen Gewicht (z.B. für Klimmzüge mit Zusatzgewicht).', trackBodyweight, (val) => { trackBodyweight = val; }),
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),
         App.el('button', {
@@ -315,11 +346,12 @@ const ExercisesView = {
             const name = nameInput.value.trim();
             if (!name) { nameInput.focus(); return; }
             const ex = {
-              id: 'custom-' + DB.uid(), name, primaryMuscle: muscleSelect.value, secondaryMuscles: [],
+              id: 'custom-' + DB.uid(), name, primaryMuscle: muscleSelect.value, secondaryMuscles: [...secondarySet],
               equipment: equipSelect.value, type: 'compound', difficulty: 'intermediate',
               description: descInput.value, execution: '', variants: [], custom: true,
               images: [], videoUrl: videoUrlInput.value.trim(),
               mediaBlob: mediaFile || null, mediaType: mediaFile ? (mediaFile.type.startsWith('video') ? 'video' : 'image') : null,
+              unilateral, alternating, trackBodyweight,
             };
             await DB.put('exercises', ex);
             Exercises.invalidate();

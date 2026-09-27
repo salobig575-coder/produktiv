@@ -275,6 +275,9 @@ const WorkoutsView = {
             ],
             restSeconds: opts.defaultRestSeconds,
             notes: '',
+            unilateral: !!ex.unilateral,
+            alternating: ex.alternating !== false,
+            trackBodyweight: !!ex.trackBodyweight,
           });
           mode = 'edit';
           renderBody();

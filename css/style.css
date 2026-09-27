@@ -434,6 +434,7 @@ textarea { resize: vertical; min-height: 90px; }
   margin-top: 4px;
 }
 .pill.overdue { background: #ffe4e4; color: var(--danger); }
+.pill.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
 @media (prefers-color-scheme: dark) {
   .pill.overdue { background: #3a1f22; }
 }
