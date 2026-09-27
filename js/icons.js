@@ -29,6 +29,9 @@ const Icons = {
   plus() {
     return this.wrap('<path d="M12 5v14M5 12h14"/>');
   },
+  close() {
+    return this.wrap('<path d="m6 6 12 12M18 6 6 18"/>');
+  },
   search() {
     return this.wrap('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.8-3.8"/>');
   },

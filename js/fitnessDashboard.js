@@ -232,10 +232,18 @@ const FitnessDashboardView = {
         ]));
       }
 
+      const selD = new Date(this.selectedDate + 'T00:00:00');
       container.innerHTML = '';
-      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:14px' }, [
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start;margin-bottom:16px' }, [
+        App.el('div', {}, [
+          App.el('h3', { style: 'margin:0' }, 'Datum wählen'),
+          App.el('div', { class: 'tag', style: 'margin-top:2px' }, selD.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })),
+        ]),
+        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
+      ]));
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
         App.el('button', { class: 'icon-btn', html: Icons.chevronUp(), style: 'transform:rotate(-90deg)', onclick: () => { view.setMonth(view.getMonth() - 1); renderCal(); } }),
-        App.el('h3', { style: 'margin:0' }, view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })),
+        App.el('div', { style: 'font-weight:700' }, view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })),
         App.el('button', { class: 'icon-btn', html: Icons.chevronUp(), style: 'transform:rotate(90deg)', onclick: () => { view.setMonth(view.getMonth() + 1); renderCal(); } }),
       ]));
       container.appendChild(grid);
