@@ -47,4 +47,25 @@ const Icons = {
   sparkles() {
     return this.wrap('<path d="M12 3.5 13.4 8 18 9.4 13.4 10.8 12 15.3 10.6 10.8 6 9.4l4.6-1.4Z"/><path d="M18.5 15.5 19.2 17.6 21.2 18.3 19.2 19 18.5 21 17.8 19 15.8 18.3 17.8 17.6Z"/>');
   },
+  planen() {
+    return this.wrap('<rect x="4" y="5" width="16" height="15" rx="2.2"/><path d="M4 9.5h16"/><path d="M8.3 3.2v3.6M15.7 3.2v3.6"/><path d="M8 13h3M8 16.3h6"/>');
+  },
+  fitness() {
+    return this.wrap('<path d="M6.5 9.5v5"/><path d="M17.5 9.5v5"/><path d="M3.5 11v2.5"/><path d="M20.5 11v2.5"/><path d="M6.5 12h11"/>');
+  },
+  weight() {
+    return this.wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M8.5 12h7"/>');
+  },
+  flame() {
+    return this.wrap('<path d="M12 3.5c1.2 2.4 3.6 3.8 3.6 7a4 4 0 0 1-3 3.87A2.6 2.6 0 0 0 12 12c-.9 1-1.3 1.9-1.3 2.9A4 4 0 0 1 7.6 11c0-1.6.7-2.6 1.4-3.6-.2 1 0 1.8.6 2.3.2-2.7 1-4.2 2.4-6.2Z"/>');
+  },
+  trophy() {
+    return this.wrap('<path d="M7 4h10v4.2a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4v1.3A3.5 3.5 0 0 0 7 10.2"/><path d="M17 5.5h3v1.3a3.5 3.5 0 0 1-3 3.4"/><path d="M12 13.5v3"/><path d="M8.5 20h7"/><path d="M9.5 16.5h5l.6 3.5h-6.2Z"/>');
+  },
+  chevronUp() {
+    return this.wrap('<path d="m6 14.5 6-6 6 6"/>');
+  },
+  chevronDown() {
+    return this.wrap('<path d="m6 9.5 6 6 6-6"/>');
+  },
 };

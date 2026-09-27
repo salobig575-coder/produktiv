@@ -3,8 +3,26 @@ const SettingsView = {
     const fileInput = App.el('input', { type: 'file', accept: 'application/json', style: 'display:none' });
     fileInput.addEventListener('change', () => this.importFile(fileInput.files[0]));
 
+    const theme = App.currentTheme();
+    const themeBtn = (key, label) => App.el('button', {
+      class: 'btn secondary' + (theme === key ? ' selected' : ''),
+      onclick: (e) => {
+        App.applyTheme(key);
+        e.currentTarget.parentElement.querySelectorAll('.btn').forEach((b) => b.classList.remove('selected'));
+        e.currentTarget.classList.add('selected');
+      },
+    }, label);
+
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, 'Darstellung'),
+        App.el('div', { class: 'fab-row', style: 'margin-bottom:0' }, [
+          themeBtn('auto', 'Automatisch'),
+          themeBtn('light', 'Hell'),
+          themeBtn('dark', 'Dunkel'),
+        ]),
+      ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.download(), style: 'width:14px;height:14px' }), 'Backup']),
         App.el('p', { class: 'tag' }, 'Alle Daten liegen lokal in einer Datenbank auf diesem Gerät. Exportiere regelmäßig eine Sicherung als Datei.'),

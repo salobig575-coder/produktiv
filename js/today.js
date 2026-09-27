@@ -72,6 +72,30 @@ const TodayView = {
       wrap.appendChild(habitCard);
     }
 
+    const profile = await ProfileView.getProfile();
+    const calc = Calc.full(profile);
+    const fitCard = App.el('div', { class: 'card hub-fitness' }, [
+      App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Fitness']),
+    ]);
+    if (calc) {
+      fitCard.appendChild(App.el('div', { class: 'stat-row' }, [
+        App.el('div', { class: 'stat' }, [
+          App.el('div', { class: 'num' }, String(calc.target)),
+          App.el('div', { class: 'lbl' }, `kcal-Ziel · ${GOALS[calc.goal].label}`),
+        ]),
+        App.el('div', { class: 'stat' }, [
+          App.el('div', { class: 'num' }, profile.weightKg ? `${profile.weightKg}` : '–'),
+          App.el('div', { class: 'lbl' }, 'Gewicht (kg)'),
+        ]),
+      ]));
+    } else {
+      fitCard.appendChild(App.el('div', { class: 'empty', style: 'padding:16px 10px' }, 'Richte dein Fitness-Profil ein, um Kalorienziele & Workouts zu sehen.'));
+    }
+    fitCard.appendChild(App.el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { FitnessHub.activeTab = calc ? 'workouts' : 'profile'; App.navigate('fitness'); } }, [
+      calc ? 'Zum Fitness-Bereich' : 'Profil einrichten', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
+    ]));
+    wrap.appendChild(fitCard);
+
     const sessions = await DB.getAll('focusSessions');
     const todaysSessions = sessions.filter((s) => App.todayStr(new Date(s.startedAt)) === today);
     const focusMin = Math.round(todaysSessions.reduce((sum, s) => sum + s.duration, 0) / 60);
@@ -87,7 +111,7 @@ const TodayView = {
           App.el('div', { class: 'lbl' }, 'Sessions'),
         ]),
       ]),
-      App.el('button', { class: 'btn secondary', style: 'margin-top:12px', onclick: () => App.navigate('focus') }, [
+      App.el('button', { class: 'btn secondary', style: 'margin-top:12px', onclick: () => { PlanenHub.activeTab = 'focus'; App.navigate('planen'); } }, [
         'Zum Fokus-Timer', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
       ]),
     ]);

@@ -5,13 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Produktiv</title>
 <meta name="theme-color" content="#6a5bff">
-<meta name="description" content="Aufgaben, Notizen, Fokus-Timer und Gewohnheiten an einem Ort.">
+<meta name="description" content="Produktivität und Fitness an einem Ort: Aufgaben, Notizen, Fokus-Timer, Habits, Workouts und Kalorienrechner.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="css/style.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 
@@ -40,22 +48,23 @@
     <nav class="bottomnav">
       <div class="nav-indicator" id="navIndicator"></div>
       <button data-route="today"><span class="ic"></span>Heute</button>
-      <button data-route="tasks"><span class="ic"></span>Aufgaben</button>
-      <button data-route="notes"><span class="ic"></span>Notizen</button>
-      <button data-route="focus"><span class="ic"></span>Fokus</button>
-      <button data-route="habits"><span class="ic"></span>Habits</button>
+      <button data-route="planen"><span class="ic"></span>Planen</button>
+      <button data-route="fitness"><span class="ic"></span>Fitness</button>
     </nav>
   </div>
 </div>
 
 <script src="js/icons.js"></script>
 <script src="js/db.js"></script>
+<script src="js/calc.js"></script>
 <script src="js/app.js"></script>
 <script src="js/today.js"></script>
 <script src="js/tasks.js"></script>
 <script src="js/notes.js"></script>
 <script src="js/focus.js"></script>
 <script src="js/habits.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/hubs.js"></script>
 <script src="js/settings.js"></script>
 <script>
   App.init();

@@ -1,5 +1,5 @@
 const DB_NAME = 'produktiv-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -30,6 +30,20 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('exercises')) {
+        db.createObjectStore('exercises', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('workouts')) {
+        db.createObjectStore('workouts', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('workoutSessions')) {
+        const s = db.createObjectStore('workoutSessions', { keyPath: 'id' });
+        s.createIndex('startedAt', 'startedAt');
+      }
+      if (!db.objectStoreNames.contains('bodyMetrics')) {
+        const s = db.createObjectStore('bodyMetrics', { keyPath: 'id' });
+        s.createIndex('date', 'date');
       }
     };
 
@@ -98,7 +112,7 @@ const DB = {
   },
 
   async exportAll() {
-    const stores = ['tasks', 'notes', 'habits', 'habitLogs', 'focusSessions', 'settings'];
+    const stores = ['tasks', 'notes', 'habits', 'habitLogs', 'focusSessions', 'settings', 'exercises', 'workouts', 'workoutSessions', 'bodyMetrics'];
     const data = {};
     for (const s of stores) {
       data[s] = await this.getAll(s);
