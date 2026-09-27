@@ -409,13 +409,13 @@ const WorkoutSessionView = {
     const recordIntensity = !!(this.state.settings && this.state.settings.recordIntensity);
     const intensityLabel = (this.state.settings && this.state.settings.intensityLabel) || 'RIR';
     const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
-    const cols = ['28px', '54px', '1fr', '1fr'];
+    const cols = ['54px', '1fr', '1fr'];
     if (recordIntensity) cols.push('56px');
     if (trackWarmup) cols.push('30px');
     const gridStyle = `display:grid;grid-template-columns:${cols.join(' ')};gap:8px;align-items:center;`;
 
     const header = App.el('div', { class: 'set-row-header', style: gridStyle }, [
-      App.el('span', {}, ''), App.el('span', {}, ''),
+      App.el('span', {}, ''),
       App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.'),
       recordIntensity ? App.el('span', {}, intensityLabel) : null,
       trackWarmup ? App.el('span', {}, '') : null,
@@ -439,6 +439,7 @@ const WorkoutSessionView = {
       weightInput.addEventListener('input', (e) => {
         set.weight = e.target.value === '' ? null : Number(e.target.value);
         updateDelta(weightDelta, set.weight, set.targetWeight);
+        if (set.weight != null && set.reps != null && !set.completed) this.completeSet(exIndex, si);
       });
 
       const repsInput = App.el('input', {
@@ -450,18 +451,15 @@ const WorkoutSessionView = {
       repsInput.addEventListener('input', (e) => {
         set.reps = e.target.value === '' ? null : Number(e.target.value);
         updateDelta(repsDelta, set.reps, set.targetReps);
+        if (set.weight != null && set.reps != null && !set.completed) this.completeSet(exIndex, si);
       });
 
       const cells = [
-        App.el('button', {
-          class: 'checkbox' + (set.completed ? ' checked' : ''), html: Icons.check(),
-          onclick: (e) => {
-            if (set.completed) { this.uncompleteSet(exIndex, si); return; }
-            e.currentTarget.classList.add('pop');
-            this.completeSet(exIndex, si);
-          },
-        }),
-        App.el('div', {}, [
+        App.el('div', {
+          style: set.completed ? 'cursor:pointer' : '',
+          title: set.completed ? 'Satz wieder bearbeiten' : '',
+          onclick: () => { if (set.completed) this.uncompleteSet(exIndex, si); },
+        }, [
           App.el('div', { class: 'set-label' }, 'Satz'),
           App.el('div', { class: 'set-label-value' }, ex.unilateral ? `${set.side}${set.round}` : String(si + 1).padStart(2, '0')),
         ]),
