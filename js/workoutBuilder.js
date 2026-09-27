@@ -1,4 +1,64 @@
-const WORKOUT_TAGS = ['Oberkörper', 'Unterkörper', 'Ganzkörper', 'Push', 'Pull', 'Sonstiges'];
+const WorkoutCategories = {
+  DEFAULTS: ['Oberkörper', 'Unterkörper', 'Ganzkörper', 'Push', 'Pull', 'Sonstiges'],
+
+  async all() {
+    const row = await DB.get('settings', 'workoutCategories');
+    if (row && Array.isArray(row.value)) return row.value;
+    await DB.put('settings', { key: 'workoutCategories', value: this.DEFAULTS });
+    return this.DEFAULTS.slice();
+  },
+
+  async add(name) {
+    const cats = await this.all();
+    if (name && !cats.includes(name)) {
+      cats.push(name);
+      await DB.put('settings', { key: 'workoutCategories', value: cats });
+    }
+    return cats;
+  },
+
+  async remove(name) {
+    const cats = (await this.all()).filter((c) => c !== name);
+    await DB.put('settings', { key: 'workoutCategories', value: cats });
+    return cats;
+  },
+
+  // Opens a small management modal (add/delete). Calls onChange() after any change so callers can re-render.
+  manage(onChange) {
+    const container = App.el('div');
+    App.showModal(App.el('div', {}, [container]));
+
+    const renderBody = async () => {
+      const cats = await this.all();
+      const list = App.el('div', { class: 'list' });
+      if (cats.length === 0) {
+        list.appendChild(App.el('div', { class: 'empty', style: 'padding:14px 10px' }, 'Keine Kategorien angelegt.'));
+      }
+      for (const cat of cats) {
+        list.appendChild(App.el('div', { class: 'item' }, [
+          App.el('div', { style: 'flex:1' }, cat),
+          App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: async () => { await this.remove(cat); onChange(); renderBody(); } }),
+        ]));
+      }
+      const nameInput = App.el('input', { type: 'text', placeholder: 'Neue Kategorie, z.B. Beine' });
+      container.innerHTML = '';
+      container.appendChild(App.el('h3', {}, 'Kategorien verwalten'));
+      container.appendChild(list);
+      container.appendChild(App.el('div', { class: 'field' }, [nameInput]));
+      container.appendChild(App.el('div', { class: 'row' }, [
+        App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Fertig'),
+        App.el('button', { class: 'btn', onclick: async () => {
+          const name = nameInput.value.trim();
+          if (!name) return;
+          await this.add(name);
+          onChange();
+          renderBody();
+        } }, [App.el('span', { html: Icons.plus(), style: 'width:16px;height:16px' }), 'Hinzufügen']),
+      ]));
+    };
+    renderBody();
+  },
+};
 
 const WorkoutsView = {
   async render() {
@@ -143,9 +203,14 @@ const WorkoutsView = {
       const nameInput = App.el('input', { type: 'text', value: w.name, placeholder: 'Workout-Name, z.B. Push Day' });
       nameInput.addEventListener('input', (e) => { w.name = e.target.value; });
 
-      const tagSelect = App.el('select', {}, ['', ...WORKOUT_TAGS].map((t) => App.el('option', { value: t }, t || '– Kategorie –')));
-      tagSelect.value = w.tag || '';
+      const categories = await WorkoutCategories.all();
+      const tagSelect = App.el('select', {}, ['', ...categories].map((t) => App.el('option', { value: t }, t || '– Kategorie –')));
+      tagSelect.value = categories.includes(w.tag) ? w.tag : '';
       tagSelect.addEventListener('change', (e) => { w.tag = e.target.value; });
+      const manageCatBtn = App.el('button', {
+        class: 'icon-btn', html: Icons.settings(), title: 'Kategorien verwalten',
+        onclick: () => WorkoutCategories.manage(() => renderBody()),
+      });
 
       const exList = App.el('div', { class: 'list', style: 'margin-bottom:14px' });
       for (let i = 0; i < w.exercises.length; i++) {
@@ -157,9 +222,10 @@ const WorkoutsView = {
 
       return App.el('div', {}, [
         App.el('h3', {}, isNew ? 'Neues Workout' : 'Workout bearbeiten'),
-        App.el('div', { class: 'row', style: 'gap:10px' }, [
+        App.el('div', { class: 'row', style: 'gap:10px;align-items:flex-end' }, [
           App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Name'), nameInput]),
           App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Kategorie'), tagSelect]),
+          manageCatBtn,
         ]),
         exList,
         App.el('button', { class: 'btn secondary', style: 'margin-bottom:14px', onclick: () => { mode = 'pick'; renderBody(); } }, [
