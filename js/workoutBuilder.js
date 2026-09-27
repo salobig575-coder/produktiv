@@ -61,10 +61,19 @@ const WorkoutCategories = {
 };
 
 const WorkoutsView = {
+  query: '',
+
   async render() {
     const wrap = App.el('div');
-    const workouts = await DB.getAll('workouts');
-    workouts.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+    const allWorkouts = await DB.getAll('workouts');
+    allWorkouts.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+
+    wrap.appendChild(App.el('div', { class: 'field' }, [
+      App.el('input', {
+        type: 'text', placeholder: 'Workouts durchsuchen…', value: this.query,
+        oninput: (e) => { this.query = e.target.value; App.refresh(); },
+      }),
+    ]));
 
     wrap.appendChild(App.el('div', { class: 'fab-row' }, [
       App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
@@ -75,11 +84,23 @@ const WorkoutsView = {
       ]) : null,
     ]));
 
-    if (workouts.length === 0) {
+    if (allWorkouts.length === 0) {
       wrap.appendChild(App.el('div', { class: 'empty' }, [
         App.el('div', { class: 'empty-icon', html: Icons.fitness() }),
         'Noch keine Workouts angelegt.',
       ]));
+      return wrap;
+    }
+
+    const q = this.query.trim().toLowerCase();
+    const workouts = q ? allWorkouts.filter((w) => (w.name || '').toLowerCase().includes(q)) : allWorkouts;
+
+    wrap.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
+      App.el('span', { class: 'set-row-header', style: 'padding:0' }, `Meine Workouts (${workouts.length})`),
+    ]));
+
+    if (workouts.length === 0) {
+      wrap.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Keine Workouts gefunden.'));
       return wrap;
     }
 
@@ -312,10 +333,10 @@ const WorkoutsView = {
     const isOpen = expanded.has(i);
 
     const header = App.el('div', { class: 'row', style: 'cursor:pointer', onclick: () => { if (isOpen) expanded.delete(i); else expanded.add(i); renderBody(); } }, [
-      App.el('span', { class: 'tag', style: 'width:20px;flex-shrink:0' }, String(i + 1)),
+      App.positionChip(i, ex ? ex.name : ''),
       App.el('div', { style: 'flex:1;min-width:0' }, [
         App.el('div', { class: 'item-title' }, ex ? ex.name : '(gelöschte Übung)'),
-        App.el('div', { class: 'item-meta' }, `${entry.sets.length} Sätze`),
+        App.el('div', { class: 'item-meta' }, entry.sets.length === 1 ? '1 Satz' : `${entry.sets.length} Sätze`),
       ]),
       App.el('span', { html: isOpen ? Icons.chevronUp() : Icons.chevronDown(), style: 'width:18px;height:18px;color:var(--text-dim);flex-shrink:0' }),
     ]);
@@ -333,22 +354,37 @@ const WorkoutsView = {
         class: 'gradient-border-btn',
         onclick: () => Exercises.showPersonalRecords(entry.exerciseId, ex ? ex.name : ''),
       }, 'Persönliche Rekorde'));
-      const setsBox = App.el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
+      const cols = ['54px', '1fr', '1fr'];
+      if (opts.recordIntensity) cols.push('56px');
+      if (opts.trackWarmupSets) cols.push('30px');
+      cols.push('30px');
+      const gridStyle = `display:grid;grid-template-columns:${cols.join(' ')};gap:8px;align-items:center;`;
+
+      const setsBox = App.el('div', { class: 'list' }, [
+        App.el('div', { class: 'set-row-header', style: gridStyle }, [
+          App.el('span', {}, ''), App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.'),
+          opts.recordIntensity ? App.el('span', {}, opts.intensityLabel) : null,
+          opts.trackWarmupSets ? App.el('span', {}, '') : null,
+          App.el('span', {}, ''),
+        ]),
+      ]);
       entry.sets.forEach((set, si) => {
-        const repsInput = App.el('input', { type: 'number', class: 'set-input', value: set.reps, style: 'text-align:center', inputmode: 'numeric' });
-        repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; });
         const weightInput = App.el('input', { type: 'number', class: 'set-input', value: set.weight, step: '0.5', style: 'text-align:center', inputmode: 'decimal' });
         weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; });
+        const repsInput = App.el('input', { type: 'number', class: 'set-input', value: set.reps, style: 'text-align:center', inputmode: 'numeric' });
+        repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; });
 
         const row = [
-          App.el('span', { class: 'tag', style: 'width:44px' }, `Satz ${si + 1}`),
-          repsInput, App.el('span', { class: 'tag' }, 'Wdh'),
-          weightInput, App.el('span', { class: 'tag' }, 'kg'),
+          App.el('div', {}, [
+            App.el('div', { class: 'set-label' }, 'Satz'),
+            App.el('div', { class: 'set-label-value' }, String(si + 1).padStart(2, '0')),
+          ]),
+          weightInput, repsInput,
         ];
         if (opts.recordIntensity) {
-          const rirInput = App.el('input', { type: 'number', class: 'set-input', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:52px', inputmode: 'numeric' });
+          const rirInput = App.el('input', { type: 'number', class: 'set-input', value: set.rir ?? '', placeholder: '–', style: 'text-align:center', inputmode: 'numeric' });
           rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
-          row.push(rirInput, App.el('span', { class: 'tag' }, opts.intensityLabel));
+          row.push(rirInput);
         }
         if (opts.trackWarmupSets) {
           row.push(App.el('button', {
@@ -356,8 +392,8 @@ const WorkoutsView = {
             onclick: () => { set.warmup = !set.warmup; renderBody(); },
           }));
         }
-        row.push(App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }));
-        setsBox.appendChild(App.el('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, row));
+        row.push(App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }));
+        setsBox.appendChild(App.el('div', { class: 'set-row', style: gridStyle }, row));
       });
       item.appendChild(setsBox);
       item.appendChild(App.el('button', { class: 'btn secondary', onclick: () => { entry.sets.push({ reps: 10, weight: entry.sets.at(-1)?.weight || 0, rir: null, warmup: false }); renderBody(); } }, '+ Satz'));

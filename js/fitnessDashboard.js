@@ -81,7 +81,10 @@ const FitnessDashboardView = {
     if (daySessions && daySessions.length) {
       const list = App.el('div', { class: 'list' });
       for (const s of daySessions) {
-        list.appendChild(App.el('div', { class: 'item' }, [
+        list.appendChild(App.el('div', {
+          class: 'item', style: 'cursor:pointer',
+          onclick: () => WorkoutSessionView.showSessionDetail(s),
+        }, [
           App.el('span', { html: Icons.check(), style: 'width:20px;height:20px;color:var(--success);flex-shrink:0' }),
           App.el('div', { style: 'flex:1;min-width:0' }, [
             App.el('div', { class: 'item-title' }, s.workoutName),

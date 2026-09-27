@@ -94,6 +94,20 @@ const App = {
     return this.el('span', { class: 'delta ' + (rounded >= 0 ? 'pos' : 'neg') }, `(${sign}${rounded}${opts.suffix || ''})`);
   },
 
+  exerciseAbbr(name) {
+    const words = (name || '').split(/[\s-]+/).filter(Boolean);
+    if (words.length === 0) return '–';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  },
+
+  positionChip(index, name, opts = {}) {
+    return this.el('div', { class: 'pos-chip' + (opts.lg ? ' lg' : '') }, [
+      this.el('div', { class: 'pos-code' }, `${index + 1}A`),
+      this.el('div', { class: 'pos-abbr' }, this.exerciseAbbr(name)),
+    ]);
+  },
+
   tabBar(tabs, activeKey, onChange) {
     const bar = this.el('div', { class: 'tab-bar' }, tabs.map((t) =>
       this.el('button', {
@@ -103,6 +117,23 @@ const App = {
     ));
     requestAnimationFrame(() => {
       const active = bar.querySelector('.tab-pill.active');
+      if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
+    });
+    return bar;
+  },
+
+  chipTabBar(tabs, activeKey, onChange) {
+    const bar = this.el('div', { class: 'chip-tab-bar' }, tabs.map((t, i) =>
+      this.el('button', {
+        class: 'chip-tab' + (t.key === activeKey ? ' active' : '') + (t.done ? ' tab-done' : ''),
+        onclick: () => onChange(t.key),
+      }, [
+        this.el('div', { class: 'pos-code' }, `${i + 1}A`),
+        this.el('div', { class: 'pos-abbr' }, this.exerciseAbbr(t.label)),
+      ])
+    ));
+    requestAnimationFrame(() => {
+      const active = bar.querySelector('.chip-tab.active');
       if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
     });
     return bar;

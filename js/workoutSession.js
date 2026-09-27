@@ -357,8 +357,8 @@ const WorkoutSessionView = {
     }
 
     if (s.exercises.length > 0) {
-      const chips = s.exercises.map((ex, i) => ({ key: String(i), label: (ex.sets.every((set) => set.completed) ? '✓ ' : '') + ex.exerciseName }));
-      wrap.appendChild(App.tabBar(chips, String(s.currentExerciseIndex), (key) => { s.currentExerciseIndex = Number(key); App.refresh(); }));
+      const chips = s.exercises.map((ex, i) => ({ key: String(i), label: ex.exerciseName, done: ex.sets.every((set) => set.completed) }));
+      wrap.appendChild(App.chipTabBar(chips, String(s.currentExerciseIndex), (key) => { s.currentExerciseIndex = Number(key); App.refresh(); }));
       wrap.appendChild(this.renderExercise(s.exercises[s.currentExerciseIndex], s.currentExerciseIndex));
     } else {
       wrap.appendChild(App.el('div', { class: 'empty' }, [App.el('div', { class: 'empty-icon', html: Icons.fitness() }), 'Füge deine erste Übung hinzu.']));
@@ -393,16 +393,23 @@ const WorkoutSessionView = {
 
   renderExercise(ex, exIndex) {
     const box = App.el('div', { class: 'card' });
-    const unit = ex.unilateral ? 2 : 1;
-    const totalUnits = ex.sets.length / unit;
-    const doneCount = ex.sets.filter((s) => s.completed).length;
-    const currentUnit = Math.min(Math.floor(doneCount / unit) + 1, totalUnits);
-    box.appendChild(App.el('h2', {}, `Satz ${currentUnit} von ${totalUnits}`));
+    const setCount = ex.unilateral ? ex.sets.length / 2 : ex.sets.length;
+    box.appendChild(App.el('div', { class: 'row', style: 'gap:10px;margin-bottom:14px' }, [
+      App.positionChip(exIndex, ex.exerciseName, { lg: true }),
+      App.el('div', { style: 'flex:1;min-width:0' }, [
+        App.el('div', { class: 'item-title', style: 'font-size:17px' }, ex.exerciseName),
+        App.el('div', { class: 'item-meta' }, setCount === 1 ? '1 Satz' : `${setCount} Sätze`),
+      ]),
+    ]));
+    box.appendChild(App.el('button', {
+      class: 'gradient-border-btn', style: 'margin-bottom:16px',
+      onclick: () => Exercises.showPersonalRecords(ex.exerciseId, ex.exerciseName),
+    }, 'Persönliche Rekorde'));
 
     const recordIntensity = !!(this.state.settings && this.state.settings.recordIntensity);
     const intensityLabel = (this.state.settings && this.state.settings.intensityLabel) || 'RIR';
     const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
-    const cols = ['30px', '52px', '1fr', '1fr'];
+    const cols = ['28px', '54px', '1fr', '1fr'];
     if (recordIntensity) cols.push('56px');
     if (trackWarmup) cols.push('30px');
     const gridStyle = `display:grid;grid-template-columns:${cols.join(' ')};gap:8px;align-items:center;`;
@@ -454,7 +461,10 @@ const WorkoutSessionView = {
             this.completeSet(exIndex, si);
           },
         }),
-        App.el('div', { class: 'set-label' }, ex.unilateral ? `${set.side}${set.round}` : `Satz ${si + 1}`),
+        App.el('div', {}, [
+          App.el('div', { class: 'set-label' }, 'Satz'),
+          App.el('div', { class: 'set-label-value' }, ex.unilateral ? `${set.side}${set.round}` : String(si + 1).padStart(2, '0')),
+        ]),
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [weightInput, weightDelta]),
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [repsInput, repsDelta]),
       ];
@@ -538,5 +548,88 @@ const WorkoutSessionView = {
 
     wrap.appendChild(App.el('button', { class: 'btn', onclick: () => { this.state.active = false; App.refresh(); } }, 'Fertig'));
     return wrap;
+  },
+
+  // Read-only breakdown of a past, finished session — exercise by exercise, set by set, with deltas vs the previous session of the same workout.
+  async showSessionDetail(session) {
+    const allSessions = await DB.getAll('workoutSessions');
+    const prevSession = allSessions
+      .filter((x) => x.id !== session.id && x.finishedAt && x.workoutId === session.workoutId && x.finishedAt < session.finishedAt)
+      .sort((a, b) => b.finishedAt - a.finishedAt)[0] || null;
+
+    const totalSets = session.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
+    const totalReps = session.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed && !s.warmup).reduce((s2, s) => s2 + (s.reps || 0), 0), 0);
+
+    const content = App.el('div', {});
+    content.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start;margin-bottom:2px' }, [
+      App.el('h3', { style: 'margin:0' }, session.workoutName),
+      session.workoutTag ? App.el('span', { class: 'pill' }, session.workoutTag) : null,
+    ]));
+    content.appendChild(App.el('div', { class: 'tag', style: 'margin-bottom:14px' }, App.formatDateTime(session.finishedAt)));
+
+    if (typeof Gyms !== 'undefined') {
+      content.appendChild(App.el('div', { style: 'margin-bottom:12px' }, [
+        App.el('a', { href: '#', onclick: (e) => { e.preventDefault(); Gyms.pickForSession(session.id); } }, session.gymName ? `Gym: ${session.gymName}` : 'Gym hinzufügen'),
+      ]));
+    }
+
+    const mkStat = (value, label, diff) => App.el('div', { class: 'stat' }, [
+      App.el('div', { class: 'num' }, [String(value), diff != null ? App.delta(diff) : null]),
+      App.el('div', { class: 'lbl' }, label),
+    ]);
+    const prevTotalSets = prevSession ? prevSession.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0) : null;
+    const prevTotalReps = prevSession ? prevSession.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed && !s.warmup).reduce((s2, s) => s2 + (s.reps || 0), 0), 0) : null;
+    content.appendChild(App.el('div', { class: 'card' }, [
+      App.el('div', { class: 'stat-row' }, [
+        mkStat(session.exerciseCount ?? session.exercises.length, 'Übungen', prevSession ? (session.exerciseCount ?? session.exercises.length) - (prevSession.exerciseCount ?? prevSession.exercises.length) : null),
+        mkStat(totalSets, 'Sätze', prevSession ? totalSets - prevTotalSets : null),
+        mkStat(totalReps, 'Wdh.', prevSession ? totalReps - prevTotalReps : null),
+        mkStat(Math.round(session.totalVolume || 0), 'Volumen (kg)', prevSession ? Math.round((session.totalVolume || 0) - (prevSession.totalVolume || 0)) : null),
+      ]),
+    ]));
+
+    if (typeof BodyMetrics !== 'undefined' && await BodyMetrics.isEnabled()) {
+      const weightCard = await BodyMetrics.card(App.todayStr(new Date(session.finishedAt)));
+      if (weightCard) content.appendChild(weightCard);
+    }
+
+    session.exercises.forEach((ex, exIndex) => {
+      const prevEx = prevSession && prevSession.exercises.find((e) => e.exerciseId === ex.exerciseId);
+      const box = App.el('div', { class: 'card' });
+      box.appendChild(App.el('div', { class: 'row', style: 'gap:10px;margin-bottom:12px' }, [
+        App.positionChip(exIndex, ex.exerciseName, { lg: true }),
+        App.el('div', { style: 'flex:1;min-width:0' }, [
+          App.el('div', { class: 'item-title', style: 'font-size:16px' }, ex.exerciseName),
+          App.el('div', { class: 'item-meta' }, ex.sets.length === 1 ? '1 Satz' : `${ex.sets.length} Sätze`),
+        ]),
+      ]));
+
+      const list = App.el('div', { class: 'list' }, [
+        App.el('div', { class: 'set-row-header', style: 'display:grid;grid-template-columns:54px 1fr 1fr;gap:8px' }, [
+          App.el('span', {}, ''), App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.'),
+        ]),
+      ]);
+      ex.sets.forEach((set, si) => {
+        const prevSet = prevEx && prevEx.sets[si];
+        const weightDelta = prevSet ? App.delta(set.weight - prevSet.weight) : null;
+        const repsDelta = prevSet ? App.delta(set.reps - prevSet.reps) : null;
+        list.appendChild(App.el('div', {
+          class: 'set-row' + (set.warmup ? ' is-warmup' : ''),
+          style: 'display:grid;grid-template-columns:54px 1fr 1fr;gap:8px;align-items:center',
+        }, [
+          App.el('div', {}, [
+            App.el('div', { class: 'set-label' }, 'Satz'),
+            App.el('div', { class: 'set-label-value' }, ex.unilateral ? `${set.side}${set.round}` : String(si + 1).padStart(2, '0')),
+          ]),
+          App.el('div', { style: 'font-size:20px;font-weight:800;display:flex;align-items:baseline;gap:6px' }, [String(set.weight ?? 0), weightDelta]),
+          App.el('div', { style: 'font-size:20px;font-weight:800;display:flex;align-items:baseline;gap:6px' }, [String(set.reps ?? 0), repsDelta]),
+        ]));
+      });
+      box.appendChild(list);
+      content.appendChild(box);
+    });
+
+    content.appendChild(App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Schließen'));
+    App.showModal(content);
   },
 };

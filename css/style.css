@@ -727,31 +727,91 @@ nav.bottomnav button:active { transform: scale(.9); }
 
 /* ---------- Set rows (live workout tracking) ---------- */
 .set-row-header {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  padding: 0 2px 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  padding: 0 2px 10px;
 }
 .set-row {
-  padding: 7px 2px;
+  padding: 10px 2px;
   border-bottom: 1px solid var(--border);
   transition: opacity .2s;
 }
 .set-row:last-child { border-bottom: none; }
 .set-row.done { opacity: .55; }
 .set-row.is-warmup { border-left: 3px solid var(--warn); padding-left: 6px; }
-.set-label { font-size: 13px; font-weight: 800; }
+.set-label { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.set-label-value { font-size: 21px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; color: var(--accent); line-height: 1.15; }
 
 input.set-input {
   background: #ffffff;
   color: #10131c;
   border: 1px solid rgba(0, 0, 0, .1);
+  font-size: 18px;
+  font-weight: 700;
+  padding: 14px 8px;
+  border-radius: 14px;
 }
 input.set-input:focus { border-color: var(--accent); background: #ffffff; }
 input.set-input::placeholder { color: #9aa0ad; opacity: 1; }
 input.set-input:disabled { opacity: .65; }
+
+/* ---------- Position chips (exercise order, e.g. "1A") ---------- */
+.pos-chip {
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 4px;
+}
+.pos-chip .pos-code { font-size: 15px; font-weight: 800; color: var(--text); }
+.pos-chip .pos-abbr { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; }
+.pos-chip.lg { width: 58px; height: 58px; border-radius: 16px; }
+
+.chip-tab-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+}
+.chip-tab-bar::-webkit-scrollbar { display: none; }
+.chip-tab {
+  flex-shrink: 0;
+  width: 64px;
+  border: none;
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 10px 4px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  position: relative;
+  transition: background .2s, transform .2s var(--ease-spring);
+}
+.chip-tab:active { transform: scale(.95); }
+.chip-tab .pos-code { font-size: 14px; font-weight: 800; color: var(--text-dim); }
+.chip-tab .pos-abbr { font-size: 10.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; opacity: .7; }
+.chip-tab.active .pos-code, .chip-tab.active .pos-abbr { color: var(--text); opacity: 1; }
+.chip-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.chip-tab.tab-done { opacity: .6; }
 
 /* ---------- Date strip (consistency view) ---------- */
 .date-strip {
