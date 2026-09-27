@@ -120,18 +120,26 @@ const WorkoutsView = {
       if (items.length === 0) {
         list.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Keine Übungen gefunden.'));
       }
-      for (const ex of items) {
+      const PICK_LIMIT = 60;
+      for (const ex of items.slice(0, PICK_LIMIT)) {
+        const thumb = ex.images && ex.images[0]
+          ? App.el('img', { src: ex.images[0], style: 'width:40px;height:40px;object-fit:cover;border-radius:9px;flex-shrink:0;background:var(--surface-2)' })
+          : null;
         list.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: () => {
           w.exercises.push({ exerciseId: ex.id, sets: [{ reps: 10, weight: 0 }, { reps: 10, weight: 0 }, { reps: 10, weight: 0 }], restSeconds: 90, notes: '' });
           mode = 'edit';
           renderBody();
         } }, [
-          App.el('div', { style: 'flex:1' }, [
+          thumb,
+          App.el('div', { style: 'flex:1;min-width:0' }, [
             App.el('div', { class: 'item-title' }, ex.name),
             App.el('div', { class: 'item-meta' }, `${ex.primaryMuscle} · ${ex.equipment}`),
           ]),
-          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent)' }),
+          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent);flex-shrink:0' }),
         ]));
+      }
+      if (items.length > PICK_LIMIT) {
+        list.appendChild(App.el('div', { class: 'empty', style: 'padding:12px 10px' }, `${PICK_LIMIT} von ${items.length} angezeigt — Suche verfeinern.`));
       }
 
       return App.el('div', {}, [

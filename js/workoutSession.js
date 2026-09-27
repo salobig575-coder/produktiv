@@ -149,7 +149,11 @@ const WorkoutSessionView = {
       const all = await Exercises.all();
       const q = query.trim().toLowerCase();
       const items = all.filter((ex) => (muscle === 'all' || ex.primaryMuscle === muscle) && (!q || ex.name.toLowerCase().includes(q)));
-      for (const ex of items) {
+      const LIMIT = 60;
+      for (const ex of items.slice(0, LIMIT)) {
+        const thumb = ex.images && ex.images[0]
+          ? App.el('img', { src: ex.images[0], style: 'width:40px;height:40px;object-fit:cover;border-radius:9px;flex-shrink:0;background:var(--surface-2)' })
+          : null;
         listBox.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: () => {
           this.state.exercises.push({ exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, sets: [
             { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, completed: false },
@@ -160,9 +164,13 @@ const WorkoutSessionView = {
           App.closeModal();
           App.refresh();
         } }, [
-          App.el('div', { style: 'flex:1' }, [App.el('div', { class: 'item-title' }, ex.name), App.el('div', { class: 'item-meta' }, ex.primaryMuscle)]),
-          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent)' }),
+          thumb,
+          App.el('div', { style: 'flex:1;min-width:0' }, [App.el('div', { class: 'item-title' }, ex.name), App.el('div', { class: 'item-meta' }, ex.primaryMuscle)]),
+          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent);flex-shrink:0' }),
         ]));
+      }
+      if (items.length > LIMIT) {
+        listBox.appendChild(App.el('div', { class: 'empty', style: 'padding:12px 10px' }, `${LIMIT} von ${items.length} angezeigt — Suche verfeinern.`));
       }
     };
 

@@ -1,6 +1,7 @@
-const MUSCLE_GROUPS = ['Brust', 'Rücken', 'Beine', 'Schultern', 'Bizeps', 'Trizeps', 'Bauch', 'Ganzkörper'];
+const MUSCLE_GROUPS = ['Brust', 'Rücken', 'Beine', 'Schultern', 'Bizeps', 'Trizeps', 'Unterarm', 'Bauch'];
+const EXERCISE_SEED_VERSION = 2;
 
-const EXERCISE_SEED = [
+const EXERCISE_SEED_CURATED = [
   // Brust
   { id: 'bench-press', name: 'Bankdrücken', primaryMuscle: 'Brust', secondaryMuscles: ['Trizeps', 'Schultern'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Der Klassiker für Brustkraft und -masse.', execution: 'Rückenlage, Stange schulterbreit-plus greifen, kontrolliert zur Brust absenken, explosiv drücken.', variants: ['incline-bench-press', 'dumbbell-bench-press', 'close-grip-bench-press'] },
   { id: 'incline-bench-press', name: 'Schrägbankdrücken', primaryMuscle: 'Brust', secondaryMuscles: ['Schultern', 'Trizeps'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Betont die obere Brust stärker als flaches Bankdrücken.', execution: 'Bank auf 30-45°, Stange zum oberen Brustbereich führen.', variants: ['bench-press', 'dumbbell-bench-press'] },
@@ -23,6 +24,8 @@ const EXERCISE_SEED = [
   { id: 'seated-cable-row', name: 'Sitzendes Kabelrudern', primaryMuscle: 'Rücken', secondaryMuscles: ['Bizeps'], equipment: 'Kabelzug', type: 'compound', difficulty: 'beginner', description: 'Kontrollierte Zugbewegung mit konstanter Spannung.', execution: 'Aufrecht sitzen, Griff zum Bauch ziehen, Schulterblätter zusammenführen.', variants: ['barbell-row'] },
   { id: 't-bar-row', name: 'T-Bar-Rudern', primaryMuscle: 'Rücken', secondaryMuscles: ['Bizeps'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Starke Übung für dicken mittleren Rücken.', execution: 'Vorgebeugt, Stange zum Oberkörper ziehen.', variants: ['barbell-row'] },
   { id: 'hyperextension', name: 'Rückenstrecker', primaryMuscle: 'Rücken', secondaryMuscles: ['Beine'], equipment: 'Maschine', type: 'isolation', difficulty: 'beginner', description: 'Kräftigt den unteren Rücken.', execution: 'Oberkörper aus der Hüfte absenken und wieder anheben.', variants: [] },
+  { id: 'rowing-machine', name: 'Rudergerät', primaryMuscle: 'Rücken', secondaryMuscles: ['Beine'], equipment: 'Maschine', type: 'cardio', difficulty: 'beginner', description: 'Schonendes Ganzkörper-Cardiotraining mit Rückenfokus.', execution: 'Mit den Beinen starten, dann Arme zum Körper ziehen.', variants: [] },
+  { id: 'farmers-walk', name: 'Farmers Walk', primaryMuscle: 'Rücken', secondaryMuscles: ['Unterarm', 'Beine'], equipment: 'Kurzhanteln', type: 'compound', difficulty: 'beginner', description: 'Baut Griffkraft und Rumpfstabilität auf.', execution: 'Schwere Gewichte aufrecht eine Strecke weit tragen.', variants: [] },
 
   // Beine
   { id: 'squat', name: 'Kniebeuge', primaryMuscle: 'Beine', secondaryMuscles: ['Bauch'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Die wichtigste Beinübung, trainiert nahezu den ganzen Körper mit.', execution: 'Stange auf dem oberen Rücken, in die Hocke gehen bis Oberschenkel parallel, hochdrücken.', variants: ['front-squat', 'goblet-squat', 'leg-press'] },
@@ -38,6 +41,9 @@ const EXERCISE_SEED = [
   { id: 'hip-thrust', name: 'Hip Thrust', primaryMuscle: 'Beine', secondaryMuscles: ['Bauch'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Eine der besten Übungen für die Gesäßmuskulatur.', execution: 'Oberer Rücken auf Bank, Hantel über der Hüfte, Hüfte nach oben drücken.', variants: [] },
   { id: 'good-morning', name: 'Good Mornings', primaryMuscle: 'Beine', secondaryMuscles: ['Rücken'], equipment: 'Langhantel', type: 'compound', difficulty: 'advanced', description: 'Kräftigt hintere Kette und unteren Rücken.', execution: 'Stange auf den Schultern, Oberkörper aus der Hüfte nach vorne beugen.', variants: ['romanian-deadlift'] },
   { id: 'adductor-machine', name: 'Adduktorenmaschine', primaryMuscle: 'Beine', secondaryMuscles: [], equipment: 'Maschine', type: 'isolation', difficulty: 'beginner', description: 'Trainiert die innere Oberschenkelmuskulatur.', execution: 'Beine gegen Widerstand zusammenführen.', variants: [] },
+  { id: 'running', name: 'Laufen', primaryMuscle: 'Beine', secondaryMuscles: ['Bauch'], equipment: 'Keine', type: 'cardio', difficulty: 'beginner', description: 'Klassisches Ausdauertraining.', execution: 'Gleichmäßiges Lauftempo über die geplante Distanz/Zeit.', variants: [] },
+  { id: 'jump-rope', name: 'Seilspringen', primaryMuscle: 'Beine', secondaryMuscles: ['Bauch'], equipment: 'Sonstiges', type: 'cardio', difficulty: 'beginner', description: 'Effizientes Koordinations- und Ausdauertraining.', execution: 'Gleichmäßig über das Seil springen.', variants: [] },
+  { id: 'kettlebell-swing', name: 'Kettlebell Swing', primaryMuscle: 'Beine', secondaryMuscles: ['Rücken', 'Bauch'], equipment: 'Kettlebell', type: 'compound', difficulty: 'intermediate', description: 'Trainiert Hüftstreckung, Kraft und Ausdauer zugleich.', execution: 'Kettlebell aus der Hüfte heraus bis Schulterhöhe schwingen.', variants: [] },
 
   // Schultern
   { id: 'shoulder-press', name: 'Schulterdrücken', primaryMuscle: 'Schultern', secondaryMuscles: ['Trizeps'], equipment: 'Langhantel', type: 'compound', difficulty: 'intermediate', description: 'Grundübung für kräftige, runde Schultern.', execution: 'Stange oder Hanteln über Kopf drücken, kontrolliert absenken.', variants: ['dumbbell-shoulder-press', 'arnold-press'] },
@@ -72,25 +78,36 @@ const EXERCISE_SEED = [
   { id: 'russian-twist', name: 'Russian Twists', primaryMuscle: 'Bauch', secondaryMuscles: [], equipment: 'Körpergewicht', type: 'core', difficulty: 'beginner', description: 'Trainiert die schrägen Bauchmuskeln.', execution: 'Im Sitzen Oberkörper von Seite zu Seite drehen.', variants: [] },
   { id: 'ab-wheel-rollout', name: 'Ab Wheel Rollout', primaryMuscle: 'Bauch', secondaryMuscles: ['Rücken'], equipment: 'Sonstiges', type: 'core', difficulty: 'advanced', description: 'Sehr intensive Übung für die gesamte Rumpfmuskulatur.', execution: 'Mit dem Rad nach vorne rollen, Rumpf stabil halten, zurückziehen.', variants: [] },
   { id: 'cable-crunch', name: 'Cable Crunch', primaryMuscle: 'Bauch', secondaryMuscles: [], equipment: 'Kabelzug', type: 'core', difficulty: 'intermediate', description: 'Ermöglicht progressive Belastung für den Bauch.', execution: 'Kniend Oberkörper gegen das Seil einrollen.', variants: ['crunches'] },
-  { id: 'mountain-climbers', name: 'Mountain Climbers', primaryMuscle: 'Bauch', secondaryMuscles: ['Ganzkörper'], equipment: 'Körpergewicht', type: 'core', difficulty: 'beginner', description: 'Kombiniert Rumpfstabilität mit erhöhter Herzfrequenz.', execution: 'Im Liegestütz Knie abwechselnd zur Brust ziehen.', variants: [] },
+  { id: 'mountain-climbers', name: 'Mountain Climbers', primaryMuscle: 'Bauch', secondaryMuscles: ['Beine'], equipment: 'Körpergewicht', type: 'core', difficulty: 'beginner', description: 'Kombiniert Rumpfstabilität mit erhöhter Herzfrequenz.', execution: 'Im Liegestütz Knie abwechselnd zur Brust ziehen.', variants: [] },
+  { id: 'burpees', name: 'Burpees', primaryMuscle: 'Bauch', secondaryMuscles: ['Beine', 'Brust'], equipment: 'Körpergewicht', type: 'cardio', difficulty: 'intermediate', description: 'Intensive Ganzkörperübung für Kraft und Ausdauer.', execution: 'In die Liegestützposition springen, Liegestütz, aufspringen.', variants: [] },
+].map((e) => ({ secondaryMuscles: [], variants: [], custom: false, images: [], videoUrl: '', ...e }));
 
-  // Ganzkörper / Cardio
-  { id: 'burpees', name: 'Burpees', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Bauch', 'Beine'], equipment: 'Körpergewicht', type: 'cardio', difficulty: 'intermediate', description: 'Intensive Ganzkörperübung für Kraft und Ausdauer.', execution: 'In die Liegestützposition springen, Liegestütz, aufspringen.', variants: [] },
-  { id: 'kettlebell-swing', name: 'Kettlebell Swing', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Beine', 'Rücken'], equipment: 'Kettlebell', type: 'compound', difficulty: 'intermediate', description: 'Trainiert Hüftstreckung, Kraft und Ausdauer zugleich.', execution: 'Kettlebell aus der Hüfte heraus bis Schulterhöhe schwingen.', variants: [] },
-  { id: 'rowing-machine', name: 'Rudergerät', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Rücken', 'Beine'], equipment: 'Maschine', type: 'cardio', difficulty: 'beginner', description: 'Schonendes Ganzkörper-Cardiotraining.', execution: 'Mit den Beinen starten, dann Arme zum Körper ziehen.', variants: [] },
-  { id: 'running', name: 'Laufen', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Beine'], equipment: 'Keine', type: 'cardio', difficulty: 'beginner', description: 'Klassisches Ausdauertraining.', execution: 'Gleichmäßiges Lauftempo über die geplante Distanz/Zeit.', variants: [] },
-  { id: 'jump-rope', name: 'Seilspringen', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Beine'], equipment: 'Sonstiges', type: 'cardio', difficulty: 'beginner', description: 'Effizientes Koordinations- und Ausdauertraining.', execution: 'Gleichmäßig über das Seil springen.', variants: [] },
-  { id: 'farmers-walk', name: 'Farmers Walk', primaryMuscle: 'Ganzkörper', secondaryMuscles: ['Rücken', 'Unterarm'], equipment: 'Kurzhanteln', type: 'compound', difficulty: 'beginner', description: 'Baut Griffkraft und Rumpfstabilität auf.', execution: 'Schwere Gewichte aufrecht eine Strecke weit tragen.', variants: [] },
-].map((e) => ({ secondaryMuscles: [], variants: [], custom: false, ...e }));
+// EXERCISE_DB_IMPORT is defined in js/exerciseDb.js (876 exercises, public domain,
+// source: https://github.com/yuhonas/free-exercise-db)
+const EXERCISE_SEED = EXERCISE_SEED_CURATED.concat(
+  (typeof EXERCISE_DB_IMPORT !== 'undefined' ? EXERCISE_DB_IMPORT : [])
+    .map((e) => ({ secondaryMuscles: [], variants: [], custom: false, videoUrl: '', images: [], ...e }))
+);
 
 const Exercises = {
   _cache: null,
 
   async ensureSeeded() {
-    const existing = await DB.getAll('exercises');
-    if (existing.length > 0) { this._cache = existing; return existing; }
-    for (const ex of EXERCISE_SEED) await DB.put('exercises', ex);
-    this._cache = EXERCISE_SEED;
+    const versionRow = await DB.get('settings', 'exerciseSeedVersion');
+    const currentVersion = versionRow ? versionRow.value : 0;
+
+    if (currentVersion < EXERCISE_SEED_VERSION) {
+      const existing = await DB.getAll('exercises');
+      const existingIds = new Set(existing.map((e) => e.id));
+      for (const ex of EXERCISE_SEED) {
+        if (!existingIds.has(ex.id)) await DB.put('exercises', ex);
+      }
+      await DB.put('settings', { key: 'exerciseSeedVersion', value: EXERCISE_SEED_VERSION });
+      this._cache = await DB.getAll('exercises');
+      return this._cache;
+    }
+
+    this._cache = await DB.getAll('exercises');
     return this._cache;
   },
 
@@ -104,18 +121,25 @@ const Exercises = {
   },
 
   invalidate() { this._cache = null; },
+
+  youTubeEmbed(url) {
+    if (!url) return null;
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/);
+    return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+  },
 };
 
 const ExercisesView = {
   query: '',
   muscle: 'all',
+  RENDER_LIMIT: 60,
 
   async render() {
     const wrap = App.el('div');
     const all = await Exercises.all();
 
     const search = App.el('input', {
-      type: 'text', placeholder: 'Übung suchen…', value: this.query,
+      type: 'text', placeholder: `${all.length} Übungen durchsuchen…`, value: this.query,
       oninput: (e) => { this.query = e.target.value; this.rerender(list, all); },
     });
     wrap.appendChild(App.el('div', { class: 'field' }, [search]));
@@ -151,27 +175,59 @@ const ExercisesView = {
       ]));
       return;
     }
-    items.forEach((ex, i) => {
+    const shown = items.slice(0, this.RENDER_LIMIT);
+    shown.forEach((ex, i) => {
+      const thumb = ex.images && ex.images[0]
+        ? App.el('img', { src: ex.images[0], style: 'width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0;background:var(--surface-2)' })
+        : App.el('span', { html: Icons.fitness(), style: 'width:44px;height:44px;padding:10px;box-sizing:border-box;color:var(--text-dim);flex-shrink:0' });
       list.appendChild(App.el('div', { class: 'item', style: `cursor:pointer;animation-delay:${Math.min(i, 10) * 25}ms`, onclick: () => this.openDetail(ex) }, [
-        App.el('div', { style: 'flex:1' }, [
+        thumb,
+        App.el('div', { style: 'flex:1;min-width:0' }, [
           App.el('div', { class: 'item-title' }, ex.name),
           App.el('div', { class: 'item-meta' }, `${ex.primaryMuscle} · ${ex.equipment}`),
         ]),
         App.el('span', { class: 'pill' }, ex.difficulty === 'beginner' ? 'Einfach' : ex.difficulty === 'advanced' ? 'Fortgeschritten' : 'Mittel'),
       ]));
     });
+    if (items.length > shown.length) {
+      list.appendChild(App.el('div', { class: 'empty', style: 'padding:16px 10px' }, `${shown.length} von ${items.length} angezeigt — Suche verfeinern für mehr.`));
+    }
   },
 
   openDetail(ex) {
+    const mediaBox = App.el('div', { style: 'margin-bottom:14px' });
+    if (ex.images && ex.images.length) {
+      const row = App.el('div', { class: 'row', style: 'gap:8px;overflow-x:auto' });
+      for (const src of ex.images) row.appendChild(App.el('img', { src, style: 'height:160px;border-radius:12px;flex-shrink:0' }));
+      mediaBox.appendChild(row);
+    }
+    if (ex.mediaBlob) {
+      const url = URL.createObjectURL(ex.mediaBlob);
+      mediaBox.appendChild(ex.mediaType === 'video'
+        ? App.el('video', { src: url, controls: true, style: 'width:100%;border-radius:12px;max-height:280px' })
+        : App.el('img', { src: url, style: 'width:100%;border-radius:12px;max-height:280px;object-fit:cover' }));
+    }
+    if (ex.videoUrl) {
+      const embed = Exercises.youTubeEmbed(ex.videoUrl);
+      mediaBox.appendChild(embed
+        ? App.el('div', { html: `<iframe src="${embed}" style="width:100%;aspect-ratio:16/9;border:none;border-radius:12px" allowfullscreen></iframe>` })
+        : App.el('a', { href: ex.videoUrl, target: '_blank', rel: 'noopener', class: 'btn secondary', style: 'display:flex' }, '▶ Video ansehen'));
+    }
+
     const content = App.el('div', {}, [
       App.el('h3', {}, ex.name),
+      mediaBox,
       App.el('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px;margin-bottom:14px' }, [
         App.el('span', { class: 'pill' }, ex.primaryMuscle),
         ...(ex.secondaryMuscles || []).map((m) => App.el('span', { class: 'pill' }, m)),
         App.el('span', { class: 'pill' }, ex.equipment),
       ]),
-      App.el('div', { class: 'field' }, [App.el('label', {}, 'Beschreibung'), App.el('div', {}, ex.description || '–')]),
-      App.el('div', { class: 'field' }, [App.el('label', {}, 'Ausführung'), App.el('div', {}, ex.execution || '–')]),
+      ex.description && ex.description === ex.execution
+        ? App.el('div', { class: 'field' }, [App.el('label', {}, 'Anleitung'), App.el('div', {}, ex.description)])
+        : App.el('div', {}, [
+            App.el('div', { class: 'field' }, [App.el('label', {}, 'Beschreibung'), App.el('div', {}, ex.description || '–')]),
+            App.el('div', { class: 'field' }, [App.el('label', {}, 'Ausführung'), App.el('div', {}, ex.execution || '–')]),
+          ]),
       App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Schließen'),
     ]);
     App.showModal(content);
@@ -182,6 +238,20 @@ const ExercisesView = {
     const muscleSelect = App.el('select', {}, MUSCLE_GROUPS.map((m) => App.el('option', { value: m }, m)));
     const equipSelect = App.el('select', {}, ['Langhantel', 'Kurzhanteln', 'Maschine', 'Kabelzug', 'Körpergewicht', 'Kettlebell', 'Sonstiges'].map((e) => App.el('option', { value: e }, e)));
     const descInput = App.el('textarea', { placeholder: 'Kurze Beschreibung (optional)' });
+    const videoUrlInput = App.el('input', { type: 'url', placeholder: 'z.B. YouTube-Link (optional)' });
+    const fileInput = App.el('input', { type: 'file', accept: 'image/*,video/*' });
+    const preview = App.el('div', { style: 'margin-top:8px' });
+    let mediaFile = null;
+
+    fileInput.addEventListener('change', () => {
+      mediaFile = fileInput.files[0] || null;
+      preview.innerHTML = '';
+      if (!mediaFile) return;
+      const url = URL.createObjectURL(mediaFile);
+      preview.appendChild(mediaFile.type.startsWith('video')
+        ? App.el('video', { src: url, controls: true, style: 'width:100%;border-radius:12px;max-height:200px' })
+        : App.el('img', { src: url, style: 'width:100%;border-radius:12px;max-height:200px;object-fit:cover' }));
+    });
 
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Eigene Übung'),
@@ -189,6 +259,8 @@ const ExercisesView = {
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Hauptmuskel'), muscleSelect]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Equipment'), equipSelect]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Beschreibung'), descInput]),
+      App.el('div', { class: 'field' }, [App.el('label', {}, 'Video-Link (optional)'), videoUrlInput]),
+      App.el('div', { class: 'field' }, [App.el('label', {}, 'Foto oder Video hochladen (optional)'), fileInput, preview]),
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),
         App.el('button', {
@@ -199,6 +271,8 @@ const ExercisesView = {
               id: 'custom-' + DB.uid(), name, primaryMuscle: muscleSelect.value, secondaryMuscles: [],
               equipment: equipSelect.value, type: 'compound', difficulty: 'intermediate',
               description: descInput.value, execution: '', variants: [], custom: true,
+              images: [], videoUrl: videoUrlInput.value.trim(),
+              mediaBlob: mediaFile || null, mediaType: mediaFile ? (mediaFile.type.startsWith('video') ? 'video' : 'image') : null,
             };
             await DB.put('exercises', ex);
             Exercises.invalidate();
