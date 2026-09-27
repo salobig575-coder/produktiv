@@ -13,13 +13,14 @@ const SettingsView = {
       },
     }, label);
 
-    const [weightRow, rirRow, warmRow, restRow, uniRestRow] = await Promise.all([
-      DB.get('settings', 'weightTrackingEnabled'), DB.get('settings', 'showRIR'),
+    const [weightRow, intensityRow, metricRow, warmRow, restRow, uniRestRow] = await Promise.all([
+      DB.get('settings', 'weightTrackingEnabled'), DB.get('settings', 'recordIntensity'), DB.get('settings', 'intensityMetric'),
       DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
       DB.get('settings', 'unilateralRestSeconds'),
     ]);
     const weightEnabled = weightRow ? weightRow.value !== false : true;
-    const showRIR = rirRow ? !!rirRow.value : false;
+    const recordIntensity = intensityRow ? !!intensityRow.value : false;
+    const intensityMetric = metricRow ? metricRow.value : 'rir';
     const trackWarmup = warmRow ? !!warmRow.value : false;
     const restSeconds = restRow ? restRow.value : 90;
     const uniRestSeconds = uniRestRow ? uniRestRow.value : 20;
@@ -31,6 +32,13 @@ const SettingsView = {
     const uniRestSelect = App.el('select', {}, [10, 15, 20, 30, 45, 60, 90].map((s) => App.el('option', { value: s }, `${s} Sekunden`)));
     uniRestSelect.value = String(uniRestSeconds);
     uniRestSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'unilateralRestSeconds', value: Number(e.target.value) }); });
+
+    const metricSelect = App.el('select', {}, [
+      App.el('option', { value: 'rir' }, 'Wiederholungen in Reserve (RIR)'),
+      App.el('option', { value: 'rpe' }, 'Belastungsempfinden (RPE)'),
+    ]);
+    metricSelect.value = intensityMetric;
+    metricSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'intensityMetric', value: e.target.value }); });
 
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
@@ -47,8 +55,9 @@ const SettingsView = {
         App.switchRow('Gewicht tracken', 'Gewichtskarte im Fitness-Bereich anzeigen und protokollieren.', weightEnabled, async (val) => {
           await DB.put('settings', { key: 'weightTrackingEnabled', value: val });
         }),
-        App.switchRow('Wiederholungen in Reserve (RIR)', 'Zeigt ein RIR-Feld bei jedem Satz im Workout-Editor und beim Training an.', showRIR, async (val) => {
-          await DB.put('settings', { key: 'showRIR', value: val });
+        App.el('div', { class: 'field', style: 'margin-top:2px' }, [App.el('label', {}, 'Intensitätsmaß'), metricSelect]),
+        App.switchRow('Intensitätsmessung aufzeichnen', 'Zeigt ein RIR/RPE-Feld bei jedem Satz im Workout-Editor und beim Training an.', recordIntensity, async (val) => {
+          await DB.put('settings', { key: 'recordIntensity', value: val });
         }),
         App.switchRow('Aufwärmsätze verfolgen', 'Erlaubt, Sätze als Aufwärmsatz zu markieren — zählen nicht zu Volumen & Rekorden.', trackWarmup, async (val) => {
           await DB.put('settings', { key: 'trackWarmupSets', value: val });

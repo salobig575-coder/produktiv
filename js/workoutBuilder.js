@@ -182,11 +182,13 @@ const WorkoutsView = {
     let pickMuscle = 'all';
     const expanded = new Set();
 
-    const [rirRow, warmRow, restRow] = await Promise.all([
-      DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
+    const [intensityRow, metricRow, warmRow, restRow] = await Promise.all([
+      DB.get('settings', 'recordIntensity'), DB.get('settings', 'intensityMetric'),
+      DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
     ]);
     const opts = {
-      showRIR: rirRow ? !!rirRow.value : false,
+      recordIntensity: intensityRow ? !!intensityRow.value : false,
+      intensityLabel: (metricRow ? metricRow.value : 'rir') === 'rpe' ? 'RPE' : 'RIR',
       trackWarmupSets: warmRow ? !!warmRow.value : false,
       defaultRestSeconds: restRow ? restRow.value : 90,
     };
@@ -340,10 +342,10 @@ const WorkoutsView = {
           repsInput, App.el('span', { class: 'tag' }, 'Wdh'),
           weightInput, App.el('span', { class: 'tag' }, 'kg'),
         ];
-        if (opts.showRIR) {
+        if (opts.recordIntensity) {
           const rirInput = App.el('input', { type: 'number', class: 'set-input', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:52px', inputmode: 'numeric' });
           rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
-          row.push(rirInput, App.el('span', { class: 'tag' }, 'RIR'));
+          row.push(rirInput, App.el('span', { class: 'tag' }, opts.intensityLabel));
         }
         if (opts.trackWarmupSets) {
           row.push(App.el('button', {

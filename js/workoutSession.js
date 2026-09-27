@@ -14,7 +14,7 @@ const WorkoutSessionView = {
     startedAt: null,
     elapsedSeconds: 0,
     finishedSummary: null,
-    settings: { showRIR: false, trackWarmupSets: false, unilateralRestSeconds: 20 },
+    settings: { recordIntensity: false, intensityLabel: 'RIR', trackWarmupSets: false, unilateralRestSeconds: 20 },
   },
 
   async lastPerformance(exerciseId, excludeSessionId) {
@@ -32,11 +32,13 @@ const WorkoutSessionView = {
   },
 
   async _readSettings() {
-    const [rir, warm, uniRest] = await Promise.all([
-      DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'unilateralRestSeconds'),
+    const [intensity, metric, warm, uniRest] = await Promise.all([
+      DB.get('settings', 'recordIntensity'), DB.get('settings', 'intensityMetric'),
+      DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'unilateralRestSeconds'),
     ]);
     return {
-      showRIR: rir ? !!rir.value : false,
+      recordIntensity: intensity ? !!intensity.value : false,
+      intensityLabel: (metric ? metric.value : 'rir') === 'rpe' ? 'RPE' : 'RIR',
       trackWarmupSets: warm ? !!warm.value : false,
       unilateralRestSeconds: uniRest ? uniRest.value : 20,
     };
@@ -105,7 +107,7 @@ const WorkoutSessionView = {
       currentExerciseIndex: 0, phase: 'active', restSecondsLeft: 0, restTotal: 90,
       intervalId: setInterval(() => this.tick(), 1000),
       startedAt: Date.now(), elapsedSeconds: 0, finishedSummary: null,
-      settings: sessSettings || { showRIR: false, trackWarmupSets: false },
+      settings: sessSettings || { recordIntensity: false, intensityLabel: 'RIR', trackWarmupSets: false },
     };
     App.refresh();
   },
@@ -380,17 +382,18 @@ const WorkoutSessionView = {
     const currentUnit = Math.min(Math.floor(doneCount / unit) + 1, totalUnits);
     box.appendChild(App.el('h2', {}, `Satz ${currentUnit} von ${totalUnits}`));
 
-    const showRIR = !!(this.state.settings && this.state.settings.showRIR);
+    const recordIntensity = !!(this.state.settings && this.state.settings.recordIntensity);
+    const intensityLabel = (this.state.settings && this.state.settings.intensityLabel) || 'RIR';
     const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
     const cols = ['30px', '52px', '1fr', '1fr'];
-    if (showRIR) cols.push('56px');
+    if (recordIntensity) cols.push('56px');
     if (trackWarmup) cols.push('30px');
     const gridStyle = `display:grid;grid-template-columns:${cols.join(' ')};gap:8px;align-items:center;`;
 
     const header = App.el('div', { class: 'set-row-header', style: gridStyle }, [
       App.el('span', {}, ''), App.el('span', {}, ''),
       App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.'),
-      showRIR ? App.el('span', {}, 'RIR') : null,
+      recordIntensity ? App.el('span', {}, intensityLabel) : null,
       trackWarmup ? App.el('span', {}, '') : null,
     ]);
 
@@ -438,7 +441,7 @@ const WorkoutSessionView = {
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [weightInput, weightDelta]),
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [repsInput, repsDelta]),
       ];
-      if (showRIR) {
+      if (recordIntensity) {
         const rirInput = App.el('input', {
           type: 'number', class: 'set-input', value: set.rir ?? '', style: 'text-align:center',
           placeholder: set.targetRir != null ? String(set.targetRir) : '–', disabled: set.completed,
