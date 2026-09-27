@@ -323,11 +323,16 @@ const WorkoutSessionView = {
       App.el('div', { style: 'font-size:15px;font-weight:700;opacity:.85' }, '🎉 Workout abgeschlossen'),
       App.el('div', { style: 'font-size:36px;font-weight:800;margin:8px 0' }, this.fmtTime(sum.duration)),
       App.el('div', { class: 'stat-row' }, [
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, String(Math.round(sum.volume))), App.el('div', { class: 'lbl' }, 'kg Volumen')]),
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, String(sum.doneSets)), App.el('div', { class: 'lbl' }, 'Sätze')]),
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, String(sum.exerciseCount)), App.el('div', { class: 'lbl' }, 'Übungen')]),
+        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumVolume' }, '0'), App.el('div', { class: 'lbl' }, 'kg Volumen')]),
+        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumSets' }, '0'), App.el('div', { class: 'lbl' }, 'Sätze')]),
+        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumExercises' }, '0'), App.el('div', { class: 'lbl' }, 'Übungen')]),
       ]),
     ]));
+    setTimeout(() => {
+      App.animateCounter(document.getElementById('sumVolume'), Math.round(sum.volume));
+      App.animateCounter(document.getElementById('sumSets'), sum.doneSets);
+      App.animateCounter(document.getElementById('sumExercises'), sum.exerciseCount);
+    }, 50);
 
     if (sum.previousVolume != null) {
       const diff = Math.round(sum.volume - sum.previousVolume);
@@ -338,7 +343,7 @@ const WorkoutSessionView = {
     }
 
     if (sum.prs.length > 0) {
-      const card = App.el('div', { class: 'card' }, [App.el('h2', {}, [App.el('span', { html: Icons.trophy(), style: 'width:14px;height:14px' }), 'Neue persönliche Rekorde'])]);
+      const card = App.el('div', { class: 'card pr-glow' }, [App.el('h2', {}, [App.el('span', { html: Icons.trophy(), style: 'width:14px;height:14px' }), 'Neue persönliche Rekorde'])]);
       const list = App.el('div', { class: 'list' });
       for (const pr of sum.prs) {
         list.appendChild(App.el('div', { class: 'item' }, [

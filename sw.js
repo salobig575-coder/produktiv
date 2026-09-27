@@ -1,4 +1,4 @@
-const CACHE_NAME = 'produktiv-v5';
+const CACHE_NAME = 'produktiv-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,9 @@ const ASSETS = [
   './js/profile.js',
   './js/exercises.js',
   './js/workoutBuilder.js',
+  './js/charts.js',
   './js/workoutSession.js',
+  './js/progress.js',
   './js/hubs.js',
   './js/settings.js',
   './icons/icon.svg',

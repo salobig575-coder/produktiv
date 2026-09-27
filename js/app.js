@@ -20,10 +20,9 @@ const App = {
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
 
-    // TEMP: SW registration disabled during active development (re-enable before final deploy)
-    // if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
-    //   navigator.serviceWorker.register('sw.js').catch(() => {});
-    // }
+    if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
 
     const splash = document.getElementById('splash');
     setTimeout(() => {

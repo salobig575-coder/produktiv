@@ -91,6 +91,8 @@ const TodayView = {
       App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Fitness']),
     ]);
     if (calc) {
+      const sessions = typeof ProgressView !== 'undefined' ? (await DB.getAll('workoutSessions')).filter((s) => s.finishedAt) : [];
+      const streak = typeof ProgressView !== 'undefined' ? ProgressView.trainingStreak(sessions) : 0;
       fitCard.appendChild(App.el('div', { class: 'stat-row' }, [
         App.el('div', { class: 'stat' }, [
           App.el('div', { class: 'num' }, String(calc.target)),
@@ -99,6 +101,10 @@ const TodayView = {
         App.el('div', { class: 'stat' }, [
           App.el('div', { class: 'num' }, profile.weightKg ? `${profile.weightKg}` : '–'),
           App.el('div', { class: 'lbl' }, 'Gewicht (kg)'),
+        ]),
+        App.el('div', { class: 'stat' }, [
+          App.el('div', { class: 'num' }, String(streak)),
+          App.el('div', { class: 'lbl' }, 'Tage-Streak'),
         ]),
       ]));
     } else {
