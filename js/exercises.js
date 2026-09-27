@@ -144,14 +144,20 @@ const ExercisesView = {
     });
     wrap.appendChild(App.el('div', { class: 'field' }, [search]));
 
-    const muscleTabs = [{ key: 'all', label: 'Alle' }, ...MUSCLE_GROUPS.map((m) => ({ key: m, label: m }))];
-    wrap.appendChild(App.tabBar(muscleTabs, this.muscle, (key) => { this.muscle = key; this.rerender(list, all); }));
+    const list = App.el('div', { class: 'list' });
+    const tabSlot = App.el('div');
+    const renderTabs = () => {
+      tabSlot.innerHTML = '';
+      const muscleTabs = [{ key: 'all', label: 'Alle' }, ...MUSCLE_GROUPS.map((m) => ({ key: m, label: m }))];
+      tabSlot.appendChild(App.tabBar(muscleTabs, this.muscle, (key) => { this.muscle = key; renderTabs(); this.rerender(list, all); }));
+    };
+    renderTabs();
+    wrap.appendChild(tabSlot);
 
     wrap.appendChild(App.el('button', { class: 'btn secondary', style: 'margin-bottom:14px', onclick: () => this.openCustomEditor(all) }, [
       App.el('span', { html: Icons.plus(), style: 'width:16px;height:16px' }), 'Eigene Übung hinzufügen',
     ]));
 
-    const list = App.el('div', { class: 'list' });
     wrap.appendChild(list);
     this.rerender(list, all);
     return wrap;

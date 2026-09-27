@@ -85,34 +85,24 @@ const TodayView = {
       wrap.appendChild(habitCard);
     }
 
-    const profile = await ProfileView.getProfile();
-    const calc = Calc.full(profile);
+    const fitSessions = (await DB.getAll('workoutSessions')).filter((s) => s.finishedAt);
+    const streak = typeof ProgressView !== 'undefined' ? ProgressView.trainingStreak(fitSessions) : 0;
+    const weekAgoTs = Date.now() - 6 * 86400000;
+    const workoutsThisWeek = fitSessions.filter((s) => s.finishedAt >= weekAgoTs).length;
+    const weightEnabled = typeof BodyMetrics !== 'undefined' && (await BodyMetrics.isEnabled());
+    const latestWeight = weightEnabled ? await BodyMetrics.latest() : null;
+
     const fitCard = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Fitness']),
+      App.el('div', { class: 'stat-row' }, [
+        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, String(streak)), App.el('div', { class: 'lbl' }, 'Tage-Streak')]),
+        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, String(workoutsThisWeek)), App.el('div', { class: 'lbl' }, 'Workouts/Woche')]),
+        weightEnabled ? App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, latestWeight ? String(latestWeight.weight) : '–'), App.el('div', { class: 'lbl' }, 'Gewicht (kg)')]) : null,
+      ]),
+      App.el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { FitnessHub.activeTab = 'uebersicht'; App.navigate('fitness'); } }, [
+        'Zum Fitness-Bereich', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
+      ]),
     ]);
-    if (calc) {
-      const sessions = typeof ProgressView !== 'undefined' ? (await DB.getAll('workoutSessions')).filter((s) => s.finishedAt) : [];
-      const streak = typeof ProgressView !== 'undefined' ? ProgressView.trainingStreak(sessions) : 0;
-      fitCard.appendChild(App.el('div', { class: 'stat-row' }, [
-        App.el('div', { class: 'stat' }, [
-          App.el('div', { class: 'num' }, String(calc.target)),
-          App.el('div', { class: 'lbl' }, `kcal-Ziel · ${GOALS[calc.goal].label}`),
-        ]),
-        App.el('div', { class: 'stat' }, [
-          App.el('div', { class: 'num' }, profile.weightKg ? `${profile.weightKg}` : '–'),
-          App.el('div', { class: 'lbl' }, 'Gewicht (kg)'),
-        ]),
-        App.el('div', { class: 'stat' }, [
-          App.el('div', { class: 'num' }, String(streak)),
-          App.el('div', { class: 'lbl' }, 'Tage-Streak'),
-        ]),
-      ]));
-    } else {
-      fitCard.appendChild(App.el('div', { class: 'empty', style: 'padding:16px 10px' }, 'Richte dein Fitness-Profil ein, um Kalorienziele & Workouts zu sehen.'));
-    }
-    fitCard.appendChild(App.el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { FitnessHub.activeTab = calc ? 'workouts' : 'profile'; App.navigate('fitness'); } }, [
-      calc ? 'Zum Fitness-Bereich' : 'Profil einrichten', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
-    ]));
     wrap.appendChild(fitCard);
 
     const sessions = await DB.getAll('focusSessions');

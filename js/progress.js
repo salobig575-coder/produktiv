@@ -5,10 +5,10 @@ const ProgressView = {
     const wrap = App.el('div');
     const sessions = (await DB.getAll('workoutSessions')).filter((s) => s.finishedAt).sort((a, b) => a.finishedAt - b.finishedAt);
     const bodyMetrics = (await DB.getAll('bodyMetrics')).sort((a, b) => a.date.localeCompare(b.date));
-    const profile = await ProfileView.getProfile();
 
     wrap.appendChild(this.renderTrainingStats(sessions));
-    wrap.appendChild(this.renderWeightCard(bodyMetrics, profile));
+    const weightCard = await this.renderWeightCard(bodyMetrics);
+    if (weightCard) wrap.appendChild(weightCard);
     wrap.appendChild(this.renderVolumeCard(sessions));
     wrap.appendChild(await this.renderStrengthCard(sessions));
     wrap.appendChild(this.renderPRList(sessions));
@@ -43,26 +43,28 @@ const ProgressView = {
     ]);
   },
 
-  renderWeightCard(bodyMetrics, profile) {
+  async renderWeightCard(bodyMetrics) {
+    if (!(await BodyMetrics.isEnabled())) return null;
     const card = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.weight(), style: 'width:14px;height:14px' }), 'Gewichtsverlauf']),
     ]);
     if (bodyMetrics.length < 2) {
-      card.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Trag dein Gewicht ein paar Mal im Profil ein, um hier einen Verlauf zu sehen.'));
+      card.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Trag dein Gewicht ein paar Mal ein, um hier einen Verlauf zu sehen.'));
       return card;
     }
     const points = bodyMetrics.map((b) => ({ label: App.formatDate(b.date).slice(0, 5), value: b.weight }));
     const first = bodyMetrics[0].weight;
     const current = bodyMetrics.at(-1).weight;
     const delta = Math.round((current - first) * 10) / 10;
+    const target = await BodyMetrics.targetWeightKg();
 
     const summary = App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:10px' }, [
       App.el('div', {}, [
         App.el('div', { style: 'font-size:28px;font-weight:800' }, [`${current} kg`, App.delta(delta, { suffix: ' kg' })]),
         App.el('div', { class: 'tag' }, 'seit Start'),
       ]),
-      profile.targetWeightKg ? App.el('div', { style: 'text-align:right' }, [
-        App.el('div', { style: 'font-size:16px;font-weight:700;color:var(--accent)' }, `${profile.targetWeightKg} kg`),
+      target ? App.el('div', { style: 'text-align:right' }, [
+        App.el('div', { style: 'font-size:16px;font-weight:700;color:var(--accent)' }, `${target} kg`),
         App.el('div', { class: 'tag' }, 'Ziel'),
       ]) : null,
     ]);
@@ -90,7 +92,7 @@ const ProgressView = {
   },
 
   async renderStrengthCard(sessions) {
-    const exerciseIds = [...new Set(sessions.flatMap((s) => s.exercises.filter((e) => e.sets.some((set) => set.completed)).map((e) => e.exerciseId)))];
+    const exerciseIds = [...new Set(sessions.flatMap((s) => s.exercises.filter((e) => e.sets.some((set) => set.completed && !set.warmup)).map((e) => e.exerciseId)))];
     const card = App.el('div', { class: 'card' }, [App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Kraftfortschritt'])]);
 
     if (exerciseIds.length === 0) {
@@ -113,7 +115,7 @@ const ProgressView = {
     for (const s of sessions) {
       const ex = s.exercises.find((e) => e.exerciseId === this.selectedExercise);
       if (!ex) continue;
-      const best = Math.max(0, ...ex.sets.filter((set) => set.completed).map((set) => Calc.estimatedOneRepMax(set.weight, set.reps)));
+      const best = Math.max(0, ...ex.sets.filter((set) => set.completed && !set.warmup).map((set) => Calc.estimatedOneRepMax(set.weight, set.reps)));
       if (best > 0) points.push({ label: App.formatDate(App.todayStr(new Date(s.finishedAt))).slice(0, 5), value: best });
     }
     if (points.length < 2) {
@@ -130,7 +132,7 @@ const ProgressView = {
     for (const s of sessions) {
       for (const ex of s.exercises) {
         for (const set of ex.sets) {
-          if (!set.completed) continue;
+          if (!set.completed || set.warmup) continue;
           const e1rm = Calc.estimatedOneRepMax(set.weight, set.reps);
           if (!best[ex.exerciseId] || e1rm > best[ex.exerciseId].e1rm) {
             best[ex.exerciseId] = { e1rm, weight: set.weight, reps: set.reps, name: ex.exerciseName };

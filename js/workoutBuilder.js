@@ -1,18 +1,19 @@
+const WORKOUT_TAGS = ['Oberkörper', 'Unterkörper', 'Ganzkörper', 'Push', 'Pull', 'Sonstiges'];
+
 const WorkoutsView = {
   async render() {
     const wrap = App.el('div');
     const workouts = await DB.getAll('workouts');
     workouts.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
 
-    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
-      App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neues Workout',
+    wrap.appendChild(App.el('div', { class: 'fab-row' }, [
+      App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
+        App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neues Workout',
+      ]),
+      typeof WorkoutSessionView !== 'undefined' ? App.el('button', { class: 'btn secondary', onclick: () => WorkoutSessionView.startAdhoc() }, [
+        App.el('span', { html: Icons.bolt(), style: 'width:16px;height:16px' }), 'Ad-hoc-Workout',
+      ]) : null,
     ]));
-    if (typeof WorkoutSessionView !== 'undefined') {
-      wrap.appendChild(App.el('button', { class: 'btn secondary', style: 'margin-top:8px', onclick: () => WorkoutSessionView.startAdhoc() }, [
-        App.el('span', { html: Icons.bolt(), style: 'width:16px;height:16px' }), 'Ad-hoc-Workout starten',
-      ]));
-    }
-    wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     if (workouts.length === 0) {
       wrap.appendChild(App.el('div', { class: 'empty' }, [
@@ -24,14 +25,20 @@ const WorkoutsView = {
 
     const list = App.el('div', { class: 'list' });
     for (const w of workouts) {
-      list.appendChild(App.el('div', { class: 'item' }, [
-        App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(w) }, [
-          App.el('div', { class: 'item-title' }, w.name || '(ohne Namen)'),
-          App.el('div', { class: 'item-meta' }, `${w.exercises.length} Übung${w.exercises.length === 1 ? '' : 'en'}`),
+      const setsEstimate = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+      list.appendChild(App.el('div', { class: 'item', style: 'flex-direction:column;align-items:stretch;gap:10px' }, [
+        App.el('div', { class: 'row', style: 'align-items:flex-start' }, [
+          App.el('div', { style: 'flex:1;min-width:0;cursor:pointer', onclick: () => this.openEditor(w) }, [
+            App.el('div', { class: 'item-title' }, w.name || '(ohne Namen)'),
+            App.el('div', { class: 'item-meta' }, `${w.exercises.length} Übung${w.exercises.length === 1 ? '' : 'en'} · ~${setsEstimate} Sätze`),
+          ]),
+          w.tag ? App.el('span', { class: 'pill' }, w.tag) : null,
+          App.el('button', { class: 'icon-btn', html: Icons.copy(), title: 'Duplizieren', onclick: () => this.duplicate(w) }),
+          App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(w, e) }),
         ]),
-        typeof WorkoutSessionView !== 'undefined' ? App.el('button', { class: 'icon-btn', html: Icons.bolt(), title: 'Starten', onclick: () => WorkoutSessionView.start(w) }) : null,
-        App.el('button', { class: 'icon-btn', html: Icons.copy(), title: 'Duplizieren', onclick: () => this.duplicate(w) }),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(w, e) }),
+        typeof WorkoutSessionView !== 'undefined' ? App.el('button', { class: 'btn', onclick: () => WorkoutSessionView.start(w) }, [
+          'Workout starten', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
+        ]) : null,
       ]));
     }
     wrap.appendChild(list);
@@ -57,17 +64,75 @@ const WorkoutsView = {
     }, 220);
   },
 
-  openEditor(workout) {
+  // Reusable "choose a workout to start" flow — search + tag tabs + start buttons.
+  openStartPicker() {
+    let query = '';
+    let tagFilter = 'recent';
+    const container = App.el('div');
+    App.showModal(App.el('div', {}, [container]));
+
+    const renderBody = async () => {
+      const workouts = await DB.getAll('workouts');
+      workouts.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+      const tags = [...new Set(workouts.map((w) => w.tag).filter(Boolean))];
+      const tabs = [{ key: 'recent', label: 'Zuletzt' }, ...tags.map((t) => ({ key: t, label: t }))];
+
+      const q = query.trim().toLowerCase();
+      let items = workouts.filter((w) => !q || (w.name || '').toLowerCase().includes(q));
+      if (tagFilter !== 'recent') items = items.filter((w) => w.tag === tagFilter);
+
+      const list = App.el('div', { class: 'list' });
+      if (items.length === 0) {
+        list.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Keine Workouts gefunden.'));
+      }
+      for (const w of items) {
+        const setsEstimate = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+        list.appendChild(App.el('div', { class: 'item', style: 'flex-direction:column;align-items:stretch;gap:8px' }, [
+          App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+            App.el('div', { style: 'flex:1;min-width:0' }, [
+              App.el('div', { class: 'item-title' }, w.name || '(ohne Namen)'),
+              App.el('div', { class: 'item-meta' }, `${w.exercises.length} Übungen · ~${setsEstimate} Sätze`),
+            ]),
+            w.tag ? App.el('span', { class: 'pill' }, w.tag) : null,
+          ]),
+          App.el('button', { class: 'btn', onclick: () => { App.closeModal(); WorkoutSessionView.start(w); } }, 'Workout starten'),
+        ]));
+      }
+
+      container.innerHTML = '';
+      container.appendChild(App.el('h3', {}, 'Workout wählen'));
+      container.appendChild(App.el('div', { class: 'field' }, [
+        App.el('input', { type: 'text', placeholder: 'Workout suchen…', value: query, oninput: (e) => { query = e.target.value; renderBody(); } }),
+      ]));
+      container.appendChild(App.tabBar(tabs, tagFilter, (key) => { tagFilter = key; renderBody(); }));
+      container.appendChild(list);
+      if (workouts.length === 0) {
+        container.appendChild(App.el('button', { class: 'btn secondary', style: 'margin-top:4px', onclick: () => { App.closeModal(); WorkoutsView.openEditor(); } }, 'Erstes Workout anlegen'));
+      }
+    };
+    renderBody();
+  },
+
+  async openEditor(workout) {
     const isNew = !workout;
-    const w = workout ? JSON.parse(JSON.stringify(workout)) : { id: DB.uid(), name: '', notes: '', exercises: [], createdAt: Date.now() };
+    const w = workout ? JSON.parse(JSON.stringify(workout)) : { id: DB.uid(), name: '', tag: '', notes: '', exercises: [], createdAt: Date.now() };
     let mode = 'edit';
     let exAll = null;
     let pickQuery = '';
     let pickMuscle = 'all';
     const expanded = new Set();
 
+    const [rirRow, warmRow, restRow] = await Promise.all([
+      DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
+    ]);
+    const opts = {
+      showRIR: rirRow ? !!rirRow.value : false,
+      trackWarmupSets: warmRow ? !!warmRow.value : false,
+      defaultRestSeconds: restRow ? restRow.value : 90,
+    };
+
     const container = App.el('div');
-    const modal = App.showModal(App.el('div', {}, [container]));
+    App.showModal(App.el('div', {}, [container]));
 
     const renderBody = async () => {
       container.innerHTML = '';
@@ -78,9 +143,13 @@ const WorkoutsView = {
       const nameInput = App.el('input', { type: 'text', value: w.name, placeholder: 'Workout-Name, z.B. Push Day' });
       nameInput.addEventListener('input', (e) => { w.name = e.target.value; });
 
+      const tagSelect = App.el('select', {}, ['', ...WORKOUT_TAGS].map((t) => App.el('option', { value: t }, t || '– Kategorie –')));
+      tagSelect.value = w.tag || '';
+      tagSelect.addEventListener('change', (e) => { w.tag = e.target.value; });
+
       const exList = App.el('div', { class: 'list', style: 'margin-bottom:14px' });
       for (let i = 0; i < w.exercises.length; i++) {
-        exList.appendChild(await this.renderExerciseRow(w, i, expanded, renderBody));
+        exList.appendChild(await this.renderExerciseRow(w, i, expanded, renderBody, opts));
       }
       if (w.exercises.length === 0) {
         exList.appendChild(App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Noch keine Übungen hinzugefügt.'));
@@ -88,7 +157,10 @@ const WorkoutsView = {
 
       return App.el('div', {}, [
         App.el('h3', {}, isNew ? 'Neues Workout' : 'Workout bearbeiten'),
-        App.el('div', { class: 'field' }, [App.el('label', {}, 'Name'), nameInput]),
+        App.el('div', { class: 'row', style: 'gap:10px' }, [
+          App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Name'), nameInput]),
+          App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Kategorie'), tagSelect]),
+        ]),
         exList,
         App.el('button', { class: 'btn secondary', style: 'margin-bottom:14px', onclick: () => { mode = 'pick'; renderBody(); } }, [
           App.el('span', { html: Icons.plus(), style: 'width:16px;height:16px' }), 'Übung hinzufügen',
@@ -126,7 +198,16 @@ const WorkoutsView = {
           ? App.el('img', { src: ex.images[0], style: 'width:40px;height:40px;object-fit:cover;border-radius:9px;flex-shrink:0;background:var(--surface-2)' })
           : null;
         list.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: () => {
-          w.exercises.push({ exerciseId: ex.id, sets: [{ reps: 10, weight: 0 }, { reps: 10, weight: 0 }, { reps: 10, weight: 0 }], restSeconds: 90, notes: '' });
+          w.exercises.push({
+            exerciseId: ex.id,
+            sets: [
+              { reps: 10, weight: 0, rir: null, warmup: false },
+              { reps: 10, weight: 0, rir: null, warmup: false },
+              { reps: 10, weight: 0, rir: null, warmup: false },
+            ],
+            restSeconds: opts.defaultRestSeconds,
+            notes: '',
+          });
           mode = 'edit';
           renderBody();
         } }, [
@@ -154,7 +235,7 @@ const WorkoutsView = {
     renderBody();
   },
 
-  async renderExerciseRow(w, i, expanded, renderBody) {
+  async renderExerciseRow(w, i, expanded, renderBody, opts) {
     const entry = w.exercises[i];
     const ex = await Exercises.byId(entry.exerciseId);
     const isOpen = expanded.has(i);
@@ -183,17 +264,30 @@ const WorkoutsView = {
         repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; });
         const weightInput = App.el('input', { type: 'number', value: set.weight, step: '0.5', style: 'text-align:center', inputmode: 'decimal' });
         weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; });
-        setsBox.appendChild(App.el('div', { class: 'row', style: 'gap:8px' }, [
+
+        const row = [
           App.el('span', { class: 'tag', style: 'width:44px' }, `Satz ${si + 1}`),
           repsInput, App.el('span', { class: 'tag' }, 'Wdh'),
           weightInput, App.el('span', { class: 'tag' }, 'kg'),
-          App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }),
-        ]));
+        ];
+        if (opts.showRIR) {
+          const rirInput = App.el('input', { type: 'number', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:52px', inputmode: 'numeric' });
+          rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
+          row.push(rirInput, App.el('span', { class: 'tag' }, 'RIR'));
+        }
+        if (opts.trackWarmupSets) {
+          row.push(App.el('button', {
+            class: 'icon-btn' + (set.warmup ? ' active-warmup' : ''), title: 'Als Aufwärmsatz markieren', html: Icons.flame(),
+            onclick: () => { set.warmup = !set.warmup; renderBody(); },
+          }));
+        }
+        row.push(App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }));
+        setsBox.appendChild(App.el('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, row));
       });
       item.appendChild(setsBox);
-      item.appendChild(App.el('button', { class: 'btn secondary', onclick: () => { entry.sets.push({ reps: 10, weight: entry.sets.at(-1)?.weight || 0 }); renderBody(); } }, '+ Satz'));
+      item.appendChild(App.el('button', { class: 'btn secondary', onclick: () => { entry.sets.push({ reps: 10, weight: entry.sets.at(-1)?.weight || 0, rir: null, warmup: false }); renderBody(); } }, '+ Satz'));
 
-      const restInput = App.el('input', { type: 'number', value: entry.restSeconds ?? 90, style: 'width:80px;text-align:center' });
+      const restInput = App.el('input', { type: 'number', value: entry.restSeconds ?? opts.defaultRestSeconds, style: 'width:80px;text-align:center' });
       restInput.addEventListener('input', (e) => { entry.restSeconds = Number(e.target.value) || 0; });
       item.appendChild(App.el('div', { class: 'row', style: 'gap:8px;margin-top:4px' }, [App.el('span', { class: 'tag' }, 'Pause (Sek.)'), restInput]));
 

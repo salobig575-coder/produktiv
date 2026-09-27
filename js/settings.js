@@ -1,5 +1,5 @@
 const SettingsView = {
-  open() {
+  async open() {
     const fileInput = App.el('input', { type: 'file', accept: 'application/json', style: 'display:none' });
     fileInput.addEventListener('change', () => this.importFile(fileInput.files[0]));
 
@@ -13,6 +13,19 @@ const SettingsView = {
       },
     }, label);
 
+    const [weightRow, rirRow, warmRow, restRow] = await Promise.all([
+      DB.get('settings', 'weightTrackingEnabled'), DB.get('settings', 'showRIR'),
+      DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
+    ]);
+    const weightEnabled = weightRow ? weightRow.value !== false : true;
+    const showRIR = rirRow ? !!rirRow.value : false;
+    const trackWarmup = warmRow ? !!warmRow.value : false;
+    const restSeconds = restRow ? restRow.value : 90;
+
+    const restSelect = App.el('select', {}, [30, 45, 60, 90, 120, 150, 180, 240].map((s) => App.el('option', { value: s }, `${s} Sekunden`)));
+    restSelect.value = String(restSeconds);
+    restSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'defaultRestSeconds', value: Number(e.target.value) }); });
+
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
       App.el('div', { class: 'card' }, [
@@ -22,6 +35,19 @@ const SettingsView = {
           themeBtn('light', 'Hell'),
           themeBtn('dark', 'Dunkel'),
         ]),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Training & Fortschritt']),
+        App.switchRow('Gewicht tracken', 'Gewichtskarte im Fitness-Bereich anzeigen und protokollieren.', weightEnabled, async (val) => {
+          await DB.put('settings', { key: 'weightTrackingEnabled', value: val });
+        }),
+        App.switchRow('Wiederholungen in Reserve (RIR)', 'Zeigt ein RIR-Feld bei jedem Satz im Workout-Editor und beim Training an.', showRIR, async (val) => {
+          await DB.put('settings', { key: 'showRIR', value: val });
+        }),
+        App.switchRow('Aufwärmsätze verfolgen', 'Erlaubt, Sätze als Aufwärmsatz zu markieren — zählen nicht zu Volumen & Rekorden.', trackWarmup, async (val) => {
+          await DB.put('settings', { key: 'trackWarmupSets', value: val });
+        }),
+        App.el('div', { class: 'field', style: 'margin-top:10px;margin-bottom:0' }, [App.el('label', {}, 'Standard-Pausenzeit'), restSelect]),
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.download(), style: 'width:14px;height:14px' }), 'Backup']),

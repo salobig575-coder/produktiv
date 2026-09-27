@@ -4,6 +4,7 @@ const WorkoutSessionView = {
     sessionId: null,
     workoutId: null,
     workoutName: '',
+    workoutTag: '',
     exercises: [],
     currentExerciseIndex: 0,
     phase: 'active',
@@ -13,6 +14,7 @@ const WorkoutSessionView = {
     startedAt: null,
     elapsedSeconds: 0,
     finishedSummary: null,
+    settings: { showRIR: false, trackWarmupSets: false },
   },
 
   async lastPerformance(exerciseId, excludeSessionId) {
@@ -27,9 +29,14 @@ const WorkoutSessionView = {
     return null;
   },
 
+  async _readSettings() {
+    const [rir, warm] = await Promise.all([DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets')]);
+    return { showRIR: rir ? !!rir.value : false, trackWarmupSets: warm ? !!warm.value : false };
+  },
+
   async start(workout) {
-    const s = this.state;
     const sessionId = DB.uid();
+    const sessSettings = await this._readSettings();
     const exercises = [];
     for (const entry of workout.exercises) {
       const ex = await Exercises.byId(entry.exerciseId);
@@ -41,25 +48,28 @@ const WorkoutSessionView = {
         return {
           targetReps: baseReps, targetWeight: baseWeight,
           reps: baseReps, weight: baseWeight,
+          rir: null, warmup: planned.warmup || false,
           completed: false,
         };
       });
       exercises.push({ exerciseId: entry.exerciseId, exerciseName: ex ? ex.name : '(gelöschte Übung)', restSeconds: entry.restSeconds || 90, sets });
     }
-    this._begin(sessionId, workout.id, workout.name, exercises);
+    this._begin(sessionId, workout.id, workout.name, exercises, workout.tag || '', sessSettings);
   },
 
   async startAdhoc() {
-    this._begin(DB.uid(), null, 'Ad-hoc-Workout', []);
+    const sessSettings = await this._readSettings();
+    this._begin(DB.uid(), null, 'Ad-hoc-Workout', [], '', sessSettings);
   },
 
-  _begin(sessionId, workoutId, workoutName, exercises) {
+  _begin(sessionId, workoutId, workoutName, exercises, workoutTag, sessSettings) {
     clearInterval(this.state.intervalId);
     this.state = {
-      active: true, sessionId, workoutId, workoutName, exercises,
+      active: true, sessionId, workoutId, workoutName, workoutTag: workoutTag || '', exercises,
       currentExerciseIndex: 0, phase: 'active', restSecondsLeft: 0, restTotal: 90,
       intervalId: setInterval(() => this.tick(), 1000),
       startedAt: Date.now(), elapsedSeconds: 0, finishedSummary: null,
+      settings: sessSettings || { showRIR: false, trackWarmupSets: false },
     };
     App.refresh();
   },
@@ -92,14 +102,17 @@ const WorkoutSessionView = {
 
   stats() {
     const s = this.state;
-    let totalSets = 0, doneSets = 0, volume = 0;
+    let totalSets = 0, doneSets = 0, volume = 0, reps = 0;
     for (const ex of s.exercises) {
       for (const set of ex.sets) {
         totalSets++;
-        if (set.completed) { doneSets++; volume += (set.reps || 0) * (set.weight || 0); }
+        if (set.completed) {
+          doneSets++;
+          if (!set.warmup) { volume += (set.reps || 0) * (set.weight || 0); reps += (set.reps || 0); }
+        }
       }
     }
-    return { totalSets, doneSets, volume };
+    return { totalSets, doneSets, volume, reps };
   },
 
   allDone() {
@@ -143,6 +156,7 @@ const WorkoutSessionView = {
     let query = '';
     let muscle = 'all';
     const listBox = App.el('div', { class: 'list' });
+    const tabSlot = App.el('div');
 
     const rerenderList = async () => {
       listBox.innerHTML = '';
@@ -156,9 +170,9 @@ const WorkoutSessionView = {
           : null;
         listBox.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: () => {
           this.state.exercises.push({ exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, sets: [
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, completed: false },
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, completed: false },
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, completed: false },
+            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
+            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
+            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
           ] });
           this.state.currentExerciseIndex = this.state.exercises.length - 1;
           App.closeModal();
@@ -174,12 +188,17 @@ const WorkoutSessionView = {
       }
     };
 
+    const renderTabs = () => {
+      tabSlot.innerHTML = '';
+      tabSlot.appendChild(App.tabBar([{ key: 'all', label: 'Alle' }, ...MUSCLE_GROUPS.map((m) => ({ key: m, label: m }))], muscle, (key) => { muscle = key; renderTabs(); rerenderList(); }));
+    };
+
     const search = App.el('input', { type: 'text', placeholder: 'Übung suchen…', oninput: (e) => { query = e.target.value; rerenderList(); } });
-    const tabs = App.tabBar([{ key: 'all', label: 'Alle' }, ...MUSCLE_GROUPS.map((m) => ({ key: m, label: m }))], muscle, (key) => { muscle = key; rerenderList(); });
 
     modalContent.appendChild(App.el('h3', {}, 'Übung hinzufügen'));
     modalContent.appendChild(App.el('div', { class: 'field' }, [search]));
-    modalContent.appendChild(tabs);
+    renderTabs();
+    modalContent.appendChild(tabSlot);
     modalContent.appendChild(listBox);
     App.showModal(modalContent);
     rerenderList();
@@ -197,7 +216,7 @@ const WorkoutSessionView = {
     clearInterval(s.intervalId);
     s.phase = 'finished';
 
-    const { totalSets, doneSets, volume } = this.stats();
+    const { doneSets, volume, reps } = this.stats();
     const prs = [];
     const sessions = await DB.getAll('workoutSessions');
     const pastCompleted = sessions.filter((x) => x.finishedAt);
@@ -208,13 +227,13 @@ const WorkoutSessionView = {
         const match = past.exercises.find((e) => e.exerciseId === ex.exerciseId);
         if (!match) continue;
         for (const set of match.sets) {
-          if (!set.completed) continue;
+          if (!set.completed || set.warmup) continue;
           bestHistoric = Math.max(bestHistoric, Calc.estimatedOneRepMax(set.weight, set.reps));
         }
       }
       let bestNow = 0, bestSet = null;
       for (const set of ex.sets) {
-        if (!set.completed) continue;
+        if (!set.completed || set.warmup) continue;
         const e1rm = Calc.estimatedOneRepMax(set.weight, set.reps);
         if (e1rm > bestNow) { bestNow = e1rm; bestSet = set; }
       }
@@ -223,21 +242,28 @@ const WorkoutSessionView = {
       }
     }
 
-    let previousVolume = null;
+    let prevStats = null;
     if (s.workoutId) {
       const prevSession = pastCompleted.filter((x) => x.workoutId === s.workoutId).sort((a, b) => b.finishedAt - a.finishedAt)[0];
-      if (prevSession) previousVolume = prevSession.totalVolume;
+      if (prevSession) {
+        prevStats = {
+          volume: prevSession.totalVolume || 0,
+          sets: prevSession.totalSets != null ? prevSession.totalSets : prevSession.exercises.reduce((sum2, e) => sum2 + e.sets.filter((st) => st.completed).length, 0),
+          reps: prevSession.totalReps != null ? prevSession.totalReps : prevSession.exercises.reduce((sum2, e) => sum2 + e.sets.filter((st) => st.completed && !st.warmup).reduce((s2, st) => s2 + (st.reps || 0), 0), 0),
+          exercises: prevSession.exerciseCount != null ? prevSession.exerciseCount : prevSession.exercises.length,
+        };
+      }
     }
 
     const record = {
-      id: s.sessionId, workoutId: s.workoutId, workoutName: s.workoutName,
+      id: s.sessionId, workoutId: s.workoutId, workoutName: s.workoutName, workoutTag: s.workoutTag || '',
       startedAt: s.startedAt, finishedAt: Date.now(),
       exercises: s.exercises.map((ex) => ({ exerciseId: ex.exerciseId, exerciseName: ex.exerciseName, sets: ex.sets })),
-      totalVolume: volume,
+      totalVolume: volume, totalReps: reps, totalSets: doneSets, exerciseCount: s.exercises.length,
     };
     await DB.put('workoutSessions', record);
 
-    s.finishedSummary = { duration: s.elapsedSeconds, volume, totalSets, doneSets, exerciseCount: s.exercises.length, prs, previousVolume };
+    s.finishedSummary = { duration: s.elapsedSeconds, volume, reps, doneSets, exerciseCount: s.exercises.length, prs, prevStats };
     App.refresh();
   },
 
@@ -249,7 +275,10 @@ const WorkoutSessionView = {
     const { totalSets, doneSets, volume } = this.stats();
 
     wrap.appendChild(App.el('div', { class: 'card hero' }, [
-      App.el('h2', {}, s.workoutName),
+      App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:2px' }, [
+        App.el('h2', { style: 'margin:0' }, s.workoutName),
+        s.workoutTag ? App.el('span', { class: 'pill', style: 'background:rgba(255,255,255,.22);color:#fff' }, s.workoutTag) : null,
+      ]),
       App.el('div', { class: 'stat-row' }, [
         App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sessElapsed' }, this.fmtTime(s.elapsedSeconds)), App.el('div', { class: 'lbl' }, 'Zeit')]),
         App.el('div', { class: 'stat' }, [App.el('div', { class: 'num' }, `${doneSets}/${totalSets}`), App.el('div', { class: 'lbl' }, 'Sätze')]),
@@ -306,6 +335,8 @@ const WorkoutSessionView = {
       const d = App.delta(diff);
       if (d) span.appendChild(d);
     };
+    const showRIR = !!(this.state.settings && this.state.settings.showRIR);
+    const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
 
     ex.sets.forEach((set, si) => {
       const repsInput = App.el('input', { type: 'number', value: set.reps, style: 'text-align:center', disabled: set.completed });
@@ -318,7 +349,7 @@ const WorkoutSessionView = {
       updateDelta(weightDelta, set.weight - set.targetWeight);
       weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; updateDelta(weightDelta, set.weight - set.targetWeight); });
 
-      list.appendChild(App.el('div', { class: 'item' + (set.completed ? ' done' : '') }, [
+      const row = [
         App.el('button', {
           class: 'checkbox' + (set.completed ? ' checked' : ''), html: Icons.check(),
           onclick: (e) => {
@@ -330,7 +361,20 @@ const WorkoutSessionView = {
         App.el('span', { class: 'tag', style: 'width:44px' }, `Satz ${si + 1}`),
         weightInput, weightDelta, App.el('span', { class: 'tag' }, 'kg'),
         repsInput, repsDelta, App.el('span', { class: 'tag' }, 'Wdh'),
-      ]));
+      ];
+      if (showRIR) {
+        const rirInput = App.el('input', { type: 'number', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:48px', disabled: set.completed });
+        rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
+        row.push(rirInput, App.el('span', { class: 'tag' }, 'RIR'));
+      }
+      if (trackWarmup) {
+        row.push(App.el('button', {
+          class: 'icon-btn' + (set.warmup ? ' active-warmup' : ''), title: 'Aufwärmsatz',
+          html: Icons.flame(), onclick: () => { set.warmup = !set.warmup; App.refresh(); },
+        }));
+      }
+
+      list.appendChild(App.el('div', { class: 'item' + (set.completed ? ' done' : '') + (set.warmup ? ' is-warmup' : ''), style: 'flex-wrap:wrap' }, row));
     });
     box.appendChild(list);
     return box;
@@ -343,25 +387,36 @@ const WorkoutSessionView = {
     wrap.appendChild(App.el('div', { class: 'card hero', style: 'text-align:center' }, [
       App.el('div', { style: 'font-size:15px;font-weight:700;opacity:.85' }, '🎉 Workout abgeschlossen'),
       App.el('div', { style: 'font-size:36px;font-weight:800;margin:8px 0' }, this.fmtTime(sum.duration)),
-      App.el('div', { class: 'stat-row' }, [
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumVolume' }, '0'), App.el('div', { class: 'lbl' }, 'kg Volumen')]),
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumSets' }, '0'), App.el('div', { class: 'lbl' }, 'Sätze')]),
-        App.el('div', { class: 'stat' }, [App.el('div', { class: 'num', id: 'sumExercises' }, '0'), App.el('div', { class: 'lbl' }, 'Übungen')]),
-      ]),
     ]));
+
+    const mkStat = (id, label) => App.el('div', { class: 'stat' }, [
+      App.el('div', { class: 'num' }, App.el('span', { id }, '0')),
+      App.el('div', { class: 'lbl' }, label),
+    ]);
+    const statCard = App.el('div', { class: 'card' }, [
+      App.el('div', { class: 'stat-row' }, [
+        mkStat('sumExercises', 'Übungen'), mkStat('sumSets', 'Sätze'), mkStat('sumReps', 'Wdh.'), mkStat('sumVolume', 'Volumen (kg)'),
+      ]),
+    ]);
+    wrap.appendChild(statCard);
+
     setTimeout(() => {
       App.animateCounter(document.getElementById('sumVolume'), Math.round(sum.volume));
       App.animateCounter(document.getElementById('sumSets'), sum.doneSets);
       App.animateCounter(document.getElementById('sumExercises'), sum.exerciseCount);
+      App.animateCounter(document.getElementById('sumReps'), sum.reps);
+      if (sum.prevStats) {
+        const addDelta = (id, diff) => {
+          const el = document.getElementById(id);
+          const d = el && App.delta(diff);
+          if (d) el.parentElement.appendChild(d);
+        };
+        addDelta('sumExercises', sum.exerciseCount - sum.prevStats.exercises);
+        addDelta('sumSets', sum.doneSets - sum.prevStats.sets);
+        addDelta('sumReps', sum.reps - sum.prevStats.reps);
+        addDelta('sumVolume', Math.round(sum.volume - sum.prevStats.volume));
+      }
     }, 50);
-
-    if (sum.previousVolume != null) {
-      const diff = Math.round(sum.volume - sum.previousVolume);
-      wrap.appendChild(App.el('div', { class: 'card' }, [
-        App.el('h2', {}, 'Im Vergleich zum letzten Mal'),
-        App.el('div', { style: 'font-size:20px;font-weight:800' }, [App.el('span', {}, 'Volumen '), App.delta(diff, { suffix: ' kg' }) || App.el('span', {}, '±0 kg')]),
-      ]));
-    }
 
     if (sum.prs.length > 0) {
       const card = App.el('div', { class: 'card pr-glow' }, [App.el('h2', {}, [App.el('span', { html: Icons.trophy(), style: 'width:14px;height:14px' }), 'Neue persönliche Rekorde'])]);

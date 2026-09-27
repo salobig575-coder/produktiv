@@ -107,6 +107,21 @@ const App = {
     return bar;
   },
 
+  switchRow(label, desc, checked, onChange) {
+    const sw = this.el('div', { class: 'switch' + (checked ? ' on' : '') });
+    sw.addEventListener('click', () => {
+      const next = !sw.classList.contains('on');
+      sw.classList.toggle('on', next);
+      onChange(next);
+    });
+    const textCol = [this.el('div', { class: 'switch-label' }, label)];
+    if (desc) textCol.push(this.el('div', { class: 'switch-desc' }, desc));
+    return this.el('div', { class: 'switch-row' }, [
+      this.el('div', { style: 'flex:1;min-width:0' }, textCol),
+      sw,
+    ]);
+  },
+
   showModal(contentNode) {
     const backdrop = this.el('div', { class: 'modal-backdrop', onclick: (e) => { if (e.target === backdrop) App.closeModal(); } });
     const modal = this.el('div', { class: 'modal' }, [contentNode]);

@@ -20,12 +20,12 @@ const PlanenHub = {
 };
 
 const FitnessHub = {
-  activeTab: 'profile',
+  activeTab: 'uebersicht',
   tabs: [
+    { key: 'uebersicht', label: 'Übersicht' },
     { key: 'workouts', label: 'Workouts' },
     { key: 'exercises', label: 'Übungen' },
     { key: 'progress', label: 'Progress' },
-    { key: 'profile', label: 'Profil' },
   ],
 
   async render() {
@@ -33,8 +33,8 @@ const FitnessHub = {
     wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('fitness'); }));
 
     let node;
-    if (this.activeTab === 'profile') {
-      node = await ProfileView.render();
+    if (this.activeTab === 'uebersicht') {
+      node = typeof FitnessDashboardView !== 'undefined' ? await FitnessDashboardView.render() : this.placeholder('Übersicht', Icons.fitness());
     } else if (this.activeTab === 'workouts') {
       if (typeof WorkoutSessionView !== 'undefined' && WorkoutSessionView.state.active) {
         node = await WorkoutSessionView.render();
@@ -42,7 +42,7 @@ const FitnessHub = {
         node = typeof WorkoutsView !== 'undefined' ? await WorkoutsView.render() : this.placeholder('Workouts', Icons.fitness());
       }
     } else if (this.activeTab === 'exercises') {
-      node = typeof ExercisesView !== 'undefined' ? await ExercisesView.render() : this.placeholder('Übungen', Icons.dumbbell ? Icons.dumbbell() : Icons.fitness());
+      node = typeof ExercisesView !== 'undefined' ? await ExercisesView.render() : this.placeholder('Übungen', Icons.fitness());
     } else if (this.activeTab === 'progress') {
       node = typeof ProgressView !== 'undefined' ? await ProgressView.render() : this.placeholder('Progress', Icons.trophy());
     }
