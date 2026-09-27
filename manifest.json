@@ -1,12 +1,12 @@
 {
   "name": "Produktiv",
   "short_name": "Produktiv",
-  "description": "Aufgaben, Notizen, Fokus-Timer und Gewohnheiten an einem Ort.",
+  "description": "Produktivität und Fitness an einem Ort: Aufgaben, Notizen, Fokus-Timer, Habits, Workouts und Kalorienrechner.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0d0e13",
-  "theme_color": "#6a5bff",
+  "background_color": "#0a0d16",
+  "theme_color": "#16a34a",
   "orientation": "portrait-primary",
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

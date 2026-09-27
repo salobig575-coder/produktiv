@@ -29,7 +29,7 @@ const FitnessHub = {
   ],
 
   async render() {
-    const wrap = App.el('div', { class: 'hub-fitness' });
+    const wrap = App.el('div');
     wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('fitness'); }));
 
     let node;

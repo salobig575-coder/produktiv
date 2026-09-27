@@ -111,9 +111,9 @@ const ProfileView = {
 
     const macroCard = App.el('div', { class: 'card' }, [
       App.el('h2', {}, 'Makro-Ziele pro Tag'),
-      this.macroRow('Protein', 'calProtein', 'g', 'var(--accent-fit)'),
-      this.macroRow('Fett', 'calFat', 'g', 'var(--warn)'),
-      this.macroRow('Kohlenhydrate', 'calCarb', 'g', 'var(--accent-2)'),
+      this.macroRow('Protein', 'calProtein', 'g'),
+      this.macroRow('Fett', 'calFat', 'g'),
+      this.macroRow('Kohlenhydrate', 'calCarb', 'g'),
     ]);
     box.appendChild(macroCard);
 
@@ -121,7 +121,7 @@ const ProfileView = {
       App.el('h2', {}, 'Kalorien je nach Ziel'),
       App.el('div', { class: 'stat-row' }, Object.entries(GOALS).map(([key, g]) =>
         App.el('div', { class: 'stat' + (key === result.goal ? '' : '') }, [
-          App.el('div', { class: 'num', style: key === result.goal ? 'color:var(--accent-fit)' : '' }, String(result.byGoal[key])),
+          App.el('div', { class: 'num', style: key === result.goal ? 'color:var(--accent)' : '' }, String(result.byGoal[key])),
           App.el('div', { class: 'lbl' }, g.label),
         ])
       )),
@@ -137,12 +137,9 @@ const ProfileView = {
     App.animateCounter(macroCard.querySelector('#calCarb'), result.carbG, { duration });
   },
 
-  macroRow(label, id, unit, color) {
+  macroRow(label, id, unit) {
     return App.el('div', { class: 'row', style: 'justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)' }, [
-      App.el('div', { class: 'row', style: 'gap:8px' }, [
-        App.el('span', { style: `width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0` }),
-        App.el('span', { style: 'font-weight:600;font-size:14px' }, label),
-      ]),
+      App.el('span', { style: 'font-weight:600;font-size:14px' }, label),
       App.el('span', { style: 'font-weight:800;font-variant-numeric:tabular-nums' }, [App.el('span', { id }, '0'), ' ' + unit]),
     ]);
   },

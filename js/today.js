@@ -10,7 +10,7 @@ const TodayView = {
 
     if (typeof WorkoutSessionView !== 'undefined' && WorkoutSessionView.state.active && WorkoutSessionView.state.phase !== 'finished') {
       const sState = WorkoutSessionView.state;
-      wrap.appendChild(App.el('div', { class: 'card hub-fitness hero', onclick: () => { FitnessHub.activeTab = 'workouts'; App.navigate('fitness'); }, style: 'cursor:pointer' }, [
+      wrap.appendChild(App.el('div', { class: 'card hero', onclick: () => { FitnessHub.activeTab = 'workouts'; App.navigate('fitness'); }, style: 'cursor:pointer' }, [
         App.el('div', { class: 'row', style: 'justify-content:space-between' }, [
           App.el('div', {}, [
             App.el('div', { style: 'font-weight:800;font-size:16px' }, `🏋️ ${sState.workoutName} läuft`),
@@ -87,7 +87,7 @@ const TodayView = {
 
     const profile = await ProfileView.getProfile();
     const calc = Calc.full(profile);
-    const fitCard = App.el('div', { class: 'card hub-fitness' }, [
+    const fitCard = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Fitness']),
     ]);
     if (calc) {

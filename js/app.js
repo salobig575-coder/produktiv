@@ -41,10 +41,7 @@ const App = {
     });
     const idx = this.routeOrder.indexOf(route);
     const indicator = document.getElementById('navIndicator');
-    if (indicator) {
-      indicator.style.transform = `translateX(${idx * 100}%)`;
-      indicator.classList.toggle('fit', route === 'fitness');
-    }
+    if (indicator) indicator.style.transform = `translateX(${idx * 100}%)`;
 
     document.getElementById('pageTitle').textContent = this.routes[route].title;
     document.getElementById('pageSub').textContent = '';
@@ -87,6 +84,13 @@ const App = {
       node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
     }
     return node;
+  },
+
+  delta(value, opts = {}) {
+    if (!value) return null;
+    const rounded = Math.round(value * 10) / 10;
+    const sign = rounded > 0 ? '+' : '';
+    return this.el('span', { class: 'delta ' + (rounded >= 0 ? 'pos' : 'neg') }, `(${sign}${rounded}${opts.suffix || ''})`);
   },
 
   tabBar(tabs, activeKey, onChange) {

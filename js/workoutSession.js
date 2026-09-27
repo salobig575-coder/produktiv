@@ -36,10 +36,11 @@ const WorkoutSessionView = {
       const history = await this.lastPerformance(entry.exerciseId, sessionId);
       const sets = entry.sets.map((planned, i) => {
         const prev = history && history[i];
+        const baseReps = prev ? prev.reps : planned.reps;
+        const baseWeight = prev ? prev.weight : planned.weight;
         return {
-          targetReps: planned.reps, targetWeight: planned.weight,
-          reps: prev ? prev.reps : planned.reps,
-          weight: prev ? prev.weight : planned.weight,
+          targetReps: baseReps, targetWeight: baseWeight,
+          reps: baseReps, weight: baseWeight,
           completed: false,
         };
       });
@@ -160,7 +161,7 @@ const WorkoutSessionView = {
           App.refresh();
         } }, [
           App.el('div', { style: 'flex:1' }, [App.el('div', { class: 'item-title' }, ex.name), App.el('div', { class: 'item-meta' }, ex.primaryMuscle)]),
-          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent-fit)' }),
+          App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px;color:var(--accent)' }),
         ]));
       }
     };
@@ -292,11 +293,23 @@ const WorkoutSessionView = {
     box.appendChild(App.el('h2', {}, `Satz ${ex.sets.filter((s) => s.completed).length + 1 <= ex.sets.length ? ex.sets.filter((s) => s.completed).length + 1 : ex.sets.length} von ${ex.sets.length}`));
 
     const list = App.el('div', { class: 'list' });
+    const updateDelta = (span, diff) => {
+      span.innerHTML = '';
+      const d = App.delta(diff);
+      if (d) span.appendChild(d);
+    };
+
     ex.sets.forEach((set, si) => {
       const repsInput = App.el('input', { type: 'number', value: set.reps, style: 'text-align:center', disabled: set.completed });
-      repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; });
+      const repsDelta = App.el('span', { style: 'display:inline-block;min-width:26px' });
+      updateDelta(repsDelta, set.reps - set.targetReps);
+      repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; updateDelta(repsDelta, set.reps - set.targetReps); });
+
       const weightInput = App.el('input', { type: 'number', value: set.weight, step: '0.5', style: 'text-align:center', disabled: set.completed });
-      weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; });
+      const weightDelta = App.el('span', { style: 'display:inline-block;min-width:32px' });
+      updateDelta(weightDelta, set.weight - set.targetWeight);
+      weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; updateDelta(weightDelta, set.weight - set.targetWeight); });
+
       list.appendChild(App.el('div', { class: 'item' + (set.completed ? ' done' : '') }, [
         App.el('button', {
           class: 'checkbox' + (set.completed ? ' checked' : ''), html: Icons.check(),
@@ -307,8 +320,8 @@ const WorkoutSessionView = {
           },
         }),
         App.el('span', { class: 'tag', style: 'width:44px' }, `Satz ${si + 1}`),
-        repsInput, App.el('span', { class: 'tag' }, 'Wdh'),
-        weightInput, App.el('span', { class: 'tag' }, 'kg'),
+        weightInput, weightDelta, App.el('span', { class: 'tag' }, 'kg'),
+        repsInput, repsDelta, App.el('span', { class: 'tag' }, 'Wdh'),
       ]));
     });
     box.appendChild(list);
@@ -338,7 +351,7 @@ const WorkoutSessionView = {
       const diff = Math.round(sum.volume - sum.previousVolume);
       wrap.appendChild(App.el('div', { class: 'card' }, [
         App.el('h2', {}, 'Im Vergleich zum letzten Mal'),
-        App.el('div', { style: `font-size:20px;font-weight:800;color:${diff >= 0 ? 'var(--success)' : 'var(--danger)'}` }, `${diff >= 0 ? '+' : ''}${diff} kg Volumen`),
+        App.el('div', { style: 'font-size:20px;font-weight:800' }, [App.el('span', {}, 'Volumen '), App.delta(diff, { suffix: ' kg' }) || App.el('span', {}, '±0 kg')]),
       ]));
     }
 

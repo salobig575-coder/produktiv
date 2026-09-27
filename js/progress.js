@@ -58,8 +58,8 @@ const ProgressView = {
 
     const summary = App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:10px' }, [
       App.el('div', {}, [
-        App.el('div', { style: 'font-size:28px;font-weight:800' }, `${current} kg`),
-        App.el('div', { class: 'tag' }, `${delta >= 0 ? '+' : ''}${delta} kg seit Start`),
+        App.el('div', { style: 'font-size:28px;font-weight:800' }, [`${current} kg`, App.delta(delta, { suffix: ' kg' })]),
+        App.el('div', { class: 'tag' }, 'seit Start'),
       ]),
       profile.targetWeightKg ? App.el('div', { style: 'text-align:right' }, [
         App.el('div', { style: 'font-size:16px;font-weight:700;color:var(--accent)' }, `${profile.targetWeightKg} kg`),

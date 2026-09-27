@@ -1,26 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #f4f5fa;
-  --bg-rgb: 244, 245, 250;
+  --bg: #f4f5f8;
+  --bg-rgb: 244, 245, 248;
   --surface: #ffffff;
   --surface-rgb: 255, 255, 255;
-  --surface-2: #eef0f7;
-  --text: #14161d;
-  --text-rgb: 20, 22, 29;
-  --text-dim: #6c7180;
-  --border: #e6e8f0;
-  --accent: #6a5bff;
-  --accent-2: #4f7cff;
-  --accent-rgb: 106, 91, 255;
-  --accent-dim: #ecebff;
-  --accent-fit: #0d9488;
-  --accent-fit-2: #10b981;
-  --accent-fit-rgb: 13, 148, 136;
-  --accent-fit-dim: #dcf5f0;
+  --surface-2: #edeff3;
+  --text: #12151c;
+  --text-rgb: 18, 21, 28;
+  --text-dim: #666c7a;
+  --border: #e2e5ec;
+  --accent: #16a34a;
+  --accent-2: #4ade80;
+  --accent-rgb: 22, 163, 74;
+  --accent-dim: #dcfce7;
   --danger: #e5484d;
-  --success: #23b26d;
+  --danger-rgb: 229, 72, 77;
+  --success: #16a34a;
   --warn: #f5a524;
+  --warn-rgb: 245, 165, 36;
   --radius: 18px;
   --radius-sm: 12px;
   --nav-h: 72px;
@@ -32,46 +30,38 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d0e13;
-    --bg-rgb: 13, 14, 19;
-    --surface: #181a22;
-    --surface-rgb: 24, 26, 34;
-    --surface-2: #21232e;
+    --bg: #0a0d16;
+    --bg-rgb: 10, 13, 22;
+    --surface: #131722;
+    --surface-rgb: 19, 23, 34;
+    --surface-2: #1a1f2c;
     --text: #f1f2f6;
     --text-rgb: 241, 242, 246;
-    --text-dim: #989db0;
-    --border: #2b2e3a;
-    --accent: #8b7cff;
-    --accent-2: #6a93ff;
-    --accent-rgb: 139, 124, 255;
-    --accent-dim: #262444;
-    --accent-fit: #2dd4bf;
-    --accent-fit-2: #34d399;
-    --accent-fit-rgb: 45, 212, 191;
-    --accent-fit-dim: #113230;
+    --text-dim: #8c93a4;
+    --border: #242a3a;
+    --accent: #34d399;
+    --accent-2: #4ade80;
+    --accent-rgb: 52, 211, 153;
+    --accent-dim: #0f3324;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
     --shadow-lg: 0 16px 40px -8px rgba(0,0,0,.6);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0d0e13;
-  --bg-rgb: 13, 14, 19;
-  --surface: #181a22;
-  --surface-rgb: 24, 26, 34;
-  --surface-2: #21232e;
+  --bg: #0a0d16;
+  --bg-rgb: 10, 13, 22;
+  --surface: #131722;
+  --surface-rgb: 19, 23, 34;
+  --surface-2: #1a1f2c;
   --text: #f1f2f6;
   --text-rgb: 241, 242, 246;
-  --text-dim: #989db0;
-  --border: #2b2e3a;
-  --accent: #8b7cff;
-  --accent-2: #6a93ff;
-  --accent-rgb: 139, 124, 255;
-  --accent-dim: #262444;
-  --accent-fit: #2dd4bf;
-  --accent-fit-2: #34d399;
-  --accent-fit-rgb: 45, 212, 191;
-  --accent-fit-dim: #113230;
+  --text-dim: #8c93a4;
+  --border: #242a3a;
+  --accent: #34d399;
+  --accent-2: #4ade80;
+  --accent-rgb: 52, 211, 153;
+  --accent-dim: #0f3324;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
   --shadow-lg: 0 16px 40px -8px rgba(0,0,0,.6);
 }
@@ -81,7 +71,12 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
+  background:
+    linear-gradient(rgba(var(--accent-rgb), .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--accent-rgb), .05) 1px, transparent 1px),
+    var(--bg);
+  background-size: 28px 28px, 28px 28px, auto;
+  background-attachment: fixed;
   color: var(--text);
   font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -.01em;
@@ -494,9 +489,6 @@ nav.bottomnav .nav-indicator {
   transition: transform .4s var(--ease-spring), background .3s var(--ease);
   z-index: 0;
 }
-nav.bottomnav .nav-indicator.fit { background: var(--accent-fit-dim); }
-nav.bottomnav button[data-route="fitness"].active { color: var(--accent-fit); }
-
 nav.bottomnav button {
   position: relative;
   z-index: 1;
@@ -521,14 +513,6 @@ nav.bottomnav button:active { transform: scale(.9); }
 
 .fab-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .fab-row .btn { flex: 1 1 auto; min-width: 84px; width: auto; }
-
-/* ---------- Fitness hub theme scoping ---------- */
-.hub-fitness {
-  --accent: var(--accent-fit);
-  --accent-2: var(--accent-fit-2);
-  --accent-rgb: var(--accent-fit-rgb);
-  --accent-dim: var(--accent-fit-dim);
-}
 
 /* ---------- Sub-tab bar ---------- */
 .tab-bar {
@@ -699,6 +683,14 @@ nav.bottomnav button:active { transform: scale(.9); }
 
 .tag { color: var(--text-dim); font-size: 12px; }
 
+.delta {
+  font-size: 12px;
+  font-weight: 800;
+  margin-left: 3px;
+}
+.delta.pos { color: var(--success); }
+.delta.neg { color: var(--danger); }
+
 /* ---------- Charts ---------- */
 .chart-wrap { width: 100%; }
 .chart-line { filter: drop-shadow(0 2px 6px rgba(var(--accent-rgb), .35)); }
@@ -746,7 +738,7 @@ nav.bottomnav button:active { transform: scale(.9); }
 .card.pr-glow { animation: prGlow 1.4s var(--ease) both; }
 @keyframes prGlow {
   0% { box-shadow: var(--shadow); }
-  30% { box-shadow: 0 0 0 3px rgba(var(--warn-rgb, 245, 165, 36), .4), var(--shadow-lg); }
+  30% { box-shadow: 0 0 0 3px rgba(var(--warn-rgb), .4), var(--shadow-lg); }
   100% { box-shadow: var(--shadow); }
 }
 
