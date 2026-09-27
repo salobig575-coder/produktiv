@@ -8,6 +8,19 @@ const TodayView = {
     dueToday.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     const openCount = tasks.filter((t) => !t.done).length;
 
+    if (typeof WorkoutSessionView !== 'undefined' && WorkoutSessionView.state.active && WorkoutSessionView.state.phase !== 'finished') {
+      const sState = WorkoutSessionView.state;
+      wrap.appendChild(App.el('div', { class: 'card hub-fitness hero', onclick: () => { FitnessHub.activeTab = 'workouts'; App.navigate('fitness'); }, style: 'cursor:pointer' }, [
+        App.el('div', { class: 'row', style: 'justify-content:space-between' }, [
+          App.el('div', {}, [
+            App.el('div', { style: 'font-weight:800;font-size:16px' }, `🏋️ ${sState.workoutName} läuft`),
+            App.el('div', { style: 'font-size:13px;opacity:.85' }, WorkoutSessionView.fmtTime(sState.elapsedSeconds) + ' · weiter tippen'),
+          ]),
+          App.el('span', { html: Icons.arrowRight(), style: 'width:20px;height:20px' }),
+        ]),
+      ]));
+    }
+
     const dateLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
     wrap.appendChild(App.el('div', { class: 'card hero' }, [
       App.el('h2', {}, 'Übersicht'),

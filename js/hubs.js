@@ -36,7 +36,11 @@ const FitnessHub = {
     if (this.activeTab === 'profile') {
       node = await ProfileView.render();
     } else if (this.activeTab === 'workouts') {
-      node = typeof WorkoutsView !== 'undefined' ? await WorkoutsView.render() : this.placeholder('Workouts', Icons.fitness());
+      if (typeof WorkoutSessionView !== 'undefined' && WorkoutSessionView.state.active) {
+        node = await WorkoutSessionView.render();
+      } else {
+        node = typeof WorkoutsView !== 'undefined' ? await WorkoutsView.render() : this.placeholder('Workouts', Icons.fitness());
+      }
     } else if (this.activeTab === 'exercises') {
       node = typeof ExercisesView !== 'undefined' ? await ExercisesView.render() : this.placeholder('Übungen', Icons.dumbbell ? Icons.dumbbell() : Icons.fitness());
     } else if (this.activeTab === 'progress') {
