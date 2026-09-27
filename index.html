@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Produktiv</title>
-<meta name="theme-color" content="#4f7cff">
+<meta name="theme-color" content="#6a5bff">
 <meta name="description" content="Aufgaben, Notizen, Fokus-Timer und Gewohnheiten an einem Ort.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -14,24 +14,41 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+<div id="splash">
+  <div class="splash-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.5 13.4 8 18 9.4 13.4 10.8 12 15.3 10.6 10.8 6 9.4l4.6-1.4Z"/>
+      <path d="M18.5 15.5 19.2 17.6 21.2 18.3 19.2 19 18.5 21 17.8 19 15.8 18.3 17.8 17.6Z"/>
+    </svg>
+  </div>
+  <div class="splash-title">Produktiv</div>
+  <div class="splash-sub">Fokus. Ordnung. Fortschritt.</div>
+  <div class="splash-dots"><span></span><span></span><span></span></div>
+</div>
+
 <div id="app">
   <header class="topbar">
     <div>
       <h1 id="pageTitle">Heute</h1>
       <div class="sub" id="pageSub"></div>
     </div>
-    <button class="icon-btn" id="settingsBtn" title="Einstellungen">⚙️</button>
+    <button id="settingsBtn" title="Einstellungen"></button>
   </header>
   <main id="view"></main>
-  <nav class="bottomnav">
-    <button data-route="today"><span class="ic">🏠</span>Heute</button>
-    <button data-route="tasks"><span class="ic">✅</span>Aufgaben</button>
-    <button data-route="notes"><span class="ic">📝</span>Notizen</button>
-    <button data-route="focus"><span class="ic">⏱️</span>Fokus</button>
-    <button data-route="habits"><span class="ic">🔥</span>Habits</button>
-  </nav>
+  <div class="nav-wrap">
+    <nav class="bottomnav">
+      <div class="nav-indicator" id="navIndicator"></div>
+      <button data-route="today"><span class="ic"></span>Heute</button>
+      <button data-route="tasks"><span class="ic"></span>Aufgaben</button>
+      <button data-route="notes"><span class="ic"></span>Notizen</button>
+      <button data-route="focus"><span class="ic"></span>Fokus</button>
+      <button data-route="habits"><span class="ic"></span>Habits</button>
+    </nav>
+  </div>
 </div>
 
+<script src="js/icons.js"></script>
 <script src="js/db.js"></script>
 <script src="js/app.js"></script>
 <script src="js/today.js"></script>

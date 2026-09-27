@@ -6,14 +6,14 @@ const SettingsView = {
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
       App.el('div', { class: 'card' }, [
-        App.el('h2', {}, 'Backup'),
+        App.el('h2', {}, [App.el('span', { html: Icons.download(), style: 'width:14px;height:14px' }), 'Backup']),
         App.el('p', { class: 'tag' }, 'Alle Daten liegen lokal in einer Datenbank auf diesem Gerät. Exportiere regelmäßig eine Sicherung als Datei.'),
-        App.el('button', { class: 'btn', style: 'margin-bottom:8px', onclick: () => this.exportFile() }, '⬇️ Backup exportieren (.json)'),
-        App.el('button', { class: 'btn secondary', onclick: () => fileInput.click() }, '⬆️ Backup importieren'),
+        App.el('button', { class: 'btn', style: 'margin-bottom:8px', onclick: () => this.exportFile() }, [App.el('span', { html: Icons.download(), style: 'width:16px;height:16px' }), 'Backup exportieren (.json)']),
+        App.el('button', { class: 'btn secondary', onclick: () => fileInput.click() }, [App.el('span', { html: Icons.upload(), style: 'width:16px;height:16px' }), 'Backup importieren']),
         fileInput,
       ]),
       App.el('div', { class: 'card' }, [
-        App.el('h2', {}, 'App installieren'),
+        App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'App installieren']),
         App.el('p', { class: 'tag' }, 'Am Handy: Browser-Menü → „Zum Startbildschirm hinzufügen“. Am PC: Adressleiste → Install-Symbol.'),
       ]),
       App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Schließen'),

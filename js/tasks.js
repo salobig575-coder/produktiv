@@ -13,8 +13,10 @@ const TasksView = {
     ]);
     wrap.appendChild(filterRow);
 
-    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, '+ Neue Aufgabe'));
-    wrap.appendChild(App.el('div', { style: 'height:12px' }));
+    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
+      App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neue Aufgabe',
+    ]));
+    wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     let visible = tasks;
     if (this.filter === 'open') visible = tasks.filter((t) => !t.done);
@@ -22,46 +24,54 @@ const TasksView = {
 
     const list = App.el('div', { class: 'list' });
     if (visible.length === 0) {
-      list.appendChild(App.el('div', { class: 'empty' }, 'Keine Aufgaben hier.'));
+      list.appendChild(App.el('div', { class: 'empty' }, [
+        App.el('div', { class: 'empty-icon', html: Icons.tasks() }),
+        'Keine Aufgaben hier.',
+      ]));
     }
     const today = App.todayStr();
-    for (const t of visible) {
+    visible.forEach((t, i) => {
       const overdue = t.dueDate && t.dueDate < today && !t.done;
-      const item = App.el('div', { class: 'item' + (t.done ? ' done' : '') }, [
+      const item = App.el('div', { class: 'item' + (t.done ? ' done' : ''), style: `animation-delay:${i * 30}ms` }, [
         App.el('button', {
           class: 'checkbox' + (t.done ? ' checked' : ''),
-          onclick: () => this.toggleDone(t),
-        }, t.done ? '✓' : ''),
+          html: Icons.check(),
+          onclick: (e) => this.toggleDone(t, e.currentTarget),
+        }),
         App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(t) }, [
           App.el('div', { class: 'item-title' }, t.title),
           t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
         ]),
-        App.el('button', { class: 'icon-btn', onclick: () => this.remove(t) }, '🗑️'),
+        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(t, e) }),
       ]);
       list.appendChild(item);
-    }
+    });
     wrap.appendChild(list);
     return wrap;
   },
 
   filterBtn(key, label) {
     return App.el('button', {
-      class: 'btn secondary',
-      style: this.filter === key ? 'outline:2px solid var(--accent)' : '',
+      class: 'btn secondary' + (this.filter === key ? ' selected' : ''),
       onclick: () => { this.filter = key; App.refresh(); },
     }, label);
   },
 
-  async toggleDone(t) {
+  async toggleDone(t, btn) {
     t.done = !t.done;
     t.updatedAt = Date.now();
+    if (btn) btn.classList.add('pop');
     await DB.put('tasks', t);
-    App.refresh();
+    setTimeout(() => App.refresh(), t.done ? 220 : 0);
   },
 
-  async remove(t) {
-    await DB.delete('tasks', t.id);
-    App.refresh();
+  async remove(t, e) {
+    const el = e.currentTarget.closest('.item');
+    if (el) el.classList.add('removing');
+    setTimeout(async () => {
+      await DB.delete('tasks', t.id);
+      App.refresh();
+    }, 220);
   },
 
   openEditor(task) {

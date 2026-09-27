@@ -9,25 +9,48 @@ const FocusView = {
     sessionStart: null,
   },
 
+  RADIUS: 42,
+
   async render() {
     const s = this.state;
     const wrap = App.el('div');
+    const circumference = 2 * Math.PI * this.RADIUS;
 
-    wrap.appendChild(App.el('div', { class: 'card' }, [
-      App.el('div', { class: 'timer-mode', id: 'timerMode' }, s.mode === 'focus' ? 'Fokus' : 'Pause'),
-      App.el('div', { class: 'timer-display', id: 'timerDisplay' }, this.fmt(s.remaining)),
-      App.el('div', { class: 'timer-controls' }, [
-        App.el('button', {
-          class: 'btn', id: 'toggleBtn',
-          onclick: () => this.toggle(),
-        }, s.running ? 'Pause' : 'Start'),
-        App.el('button', { class: 'btn secondary', onclick: () => this.reset() }, 'Zurücksetzen'),
+    const ringWrap = App.el('div', { class: 'timer-ring-wrap' + (s.running ? ' running' : ''), id: 'ringWrap' }, [
+      App.el('div', {
+        html: `<svg viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="ringGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" style="stop-color:var(--accent)"/>
+              <stop offset="1" style="stop-color:var(--accent-2)"/>
+            </linearGradient>
+          </defs>
+          <circle class="timer-ring-bg" cx="50" cy="50" r="${this.RADIUS}"/>
+          <circle class="timer-ring-progress" id="ringProgress" cx="50" cy="50" r="${this.RADIUS}"
+            stroke-dasharray="${circumference}" stroke-dashoffset="${this.offset(circumference)}"/>
+        </svg>`,
+      }),
+      App.el('div', { class: 'timer-center' }, [
+        App.el('div', { class: 'timer-display', id: 'timerDisplay' }, this.fmt(s.remaining)),
+        App.el('div', { class: 'timer-mode', id: 'timerMode' }, s.mode === 'focus' ? 'Fokus' : 'Pause'),
       ]),
-      !s.running ? App.el('div', { class: 'row', style: 'justify-content:center;gap:16px;margin-top:6px' }, [
+    ]);
+    wrap.appendChild(ringWrap);
+
+    wrap.appendChild(App.el('div', { class: 'timer-controls' }, [
+      App.el('button', {
+        class: 'btn', id: 'toggleBtn',
+        onclick: () => this.toggle(),
+      }, s.running ? 'Pause' : 'Start'),
+      App.el('button', { class: 'btn secondary', onclick: () => this.reset() }, 'Zurücksetzen'),
+    ]));
+
+    if (!s.running) {
+      wrap.appendChild(App.el('div', { class: 'row', style: 'justify-content:center;gap:16px;margin-bottom:16px' }, [
         this.durationPicker('focusMin', 'Fokus (Min)'),
         this.durationPicker('breakMin', 'Pause (Min)'),
-      ]) : null,
-    ]));
+      ]));
+    }
 
     const today = App.todayStr();
     const sessions = await DB.getAll('focusSessions');
@@ -46,6 +69,13 @@ const FocusView = {
     ]));
 
     return wrap;
+  },
+
+  offset(circumference) {
+    const s = this.state;
+    const total = (s.mode === 'focus' ? s.focusMin : s.breakMin) * 60;
+    const frac = total > 0 ? s.remaining / total : 0;
+    return circumference * (1 - frac);
   },
 
   durationPicker(key, label) {
@@ -104,11 +134,19 @@ const FocusView = {
     App.refresh();
   },
 
+  updateRing() {
+    const ring = document.getElementById('ringProgress');
+    if (!ring) return;
+    const circumference = 2 * Math.PI * this.RADIUS;
+    ring.style.strokeDashoffset = this.offset(circumference);
+  },
+
   async tick() {
     const s = this.state;
     s.remaining -= 1;
     const display = document.getElementById('timerDisplay');
     if (display) display.textContent = this.fmt(Math.max(0, s.remaining));
+    this.updateRing();
 
     if (s.remaining <= 0) {
       if (s.mode === 'focus') {

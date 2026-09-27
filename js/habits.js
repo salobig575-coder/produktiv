@@ -5,11 +5,16 @@ const HabitsView = {
     habits.sort((a, b) => a.createdAt - b.createdAt);
     const logs = await DB.getAll('habitLogs');
 
-    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, '+ Neue Gewohnheit'));
-    wrap.appendChild(App.el('div', { style: 'height:12px' }));
+    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
+      App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neue Gewohnheit',
+    ]));
+    wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     if (habits.length === 0) {
-      wrap.appendChild(App.el('div', { class: 'empty' }, 'Noch keine Gewohnheiten angelegt.'));
+      wrap.appendChild(App.el('div', { class: 'empty' }, [
+        App.el('div', { class: 'empty-icon', html: Icons.habits() }),
+        'Noch keine Gewohnheiten angelegt.',
+      ]));
       return wrap;
     }
 
@@ -29,7 +34,7 @@ const HabitsView = {
         const logged = logs.some((l) => l.habitId === h.id && l.date === d.iso);
         grid.appendChild(App.el('button', {
           class: 'dot' + (logged ? ' on' : ''),
-          onclick: () => this.toggleLog(h.id, d.iso),
+          onclick: (e) => this.toggleLog(h.id, d.iso, e.currentTarget),
         }));
       }
     }
@@ -40,11 +45,12 @@ const HabitsView = {
     for (const h of habits) {
       const streak = this.streak(logs, h.id);
       list.appendChild(App.el('div', { class: 'item' }, [
+        App.el('span', { html: Icons.habits(), style: `width:20px;height:20px;flex-shrink:0;color:${streak > 0 ? 'var(--warn)' : 'var(--text-dim)'}` }),
         App.el('div', { style: 'flex:1' }, [
           App.el('div', { class: 'item-title' }, h.name),
-          App.el('div', { class: 'item-meta' }, streak > 0 ? `🔥 ${streak} Tage in Folge` : 'Noch keine Serie'),
+          App.el('div', { class: 'item-meta' }, streak > 0 ? `${streak} Tage in Folge` : 'Noch keine Serie'),
         ]),
-        App.el('button', { class: 'icon-btn', onclick: () => this.remove(h) }, '🗑️'),
+        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
       ]));
     }
     wrap.appendChild(list);
@@ -75,7 +81,8 @@ const HabitsView = {
     return count;
   },
 
-  async toggleLog(habitId, dateIso) {
+  async toggleLog(habitId, dateIso, btn) {
+    if (btn) btn.classList.add('pop');
     const logs = await DB.getAll('habitLogs');
     const existing = logs.find((l) => l.habitId === habitId && l.date === dateIso);
     if (existing) {
@@ -83,16 +90,20 @@ const HabitsView = {
     } else {
       await DB.put('habitLogs', { id: DB.uid(), habitId, date: dateIso });
     }
-    App.refresh();
+    setTimeout(() => App.refresh(), 180);
   },
 
-  async remove(h) {
-    await DB.delete('habits', h.id);
-    const logs = await DB.getAll('habitLogs');
-    for (const l of logs.filter((x) => x.habitId === h.id)) {
-      await DB.delete('habitLogs', l.id);
-    }
-    App.refresh();
+  async remove(h, e) {
+    const el = e.currentTarget.closest('.item');
+    if (el) el.classList.add('removing');
+    setTimeout(async () => {
+      await DB.delete('habits', h.id);
+      const logs = await DB.getAll('habitLogs');
+      for (const l of logs.filter((x) => x.habitId === h.id)) {
+        await DB.delete('habitLogs', l.id);
+      }
+      App.refresh();
+    }, 220);
   },
 
   openEditor(habit) {

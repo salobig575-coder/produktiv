@@ -7,12 +7,19 @@ const NotesView = {
     notes.sort((a, b) => b.updatedAt - a.updatedAt);
 
     const search = App.el('input', {
-      type: 'text', placeholder: '🔍 Notizen durchsuchen…', value: this.query,
+      type: 'text', placeholder: 'Notizen durchsuchen…', value: this.query,
       oninput: (e) => { this.query = e.target.value; this.rerenderList(list, notes); },
     });
-    wrap.appendChild(App.el('div', { class: 'field' }, [search]));
-    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, '+ Neue Notiz'));
-    wrap.appendChild(App.el('div', { style: 'height:12px' }));
+    const searchWrap = App.el('div', { class: 'field', style: 'position:relative' }, [
+      App.el('span', { html: Icons.search(), style: 'position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-dim)' }),
+      search,
+    ]);
+    search.style.paddingLeft = '38px';
+    wrap.appendChild(searchWrap);
+    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
+      App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neue Notiz',
+    ]));
+    wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     const list = App.el('div', { class: 'list' });
     wrap.appendChild(list);
@@ -25,24 +32,32 @@ const NotesView = {
     const q = this.query.toLowerCase();
     const filtered = q ? notes.filter((n) => (n.title + ' ' + n.content).toLowerCase().includes(q)) : notes;
     if (filtered.length === 0) {
-      list.appendChild(App.el('div', { class: 'empty' }, 'Keine Notizen gefunden.'));
+      list.appendChild(App.el('div', { class: 'empty' }, [
+        App.el('div', { class: 'empty-icon', html: Icons.notes() }),
+        'Keine Notizen gefunden.',
+      ]));
       return;
     }
-    for (const n of filtered) {
+    filtered.forEach((n, i) => {
       const preview = (n.content || '').slice(0, 80);
-      list.appendChild(App.el('div', { class: 'item', style: 'align-items:flex-start;cursor:pointer', onclick: () => this.openEditor(n) }, [
+      list.appendChild(App.el('div', { class: 'item', style: `align-items:flex-start;cursor:pointer;animation-delay:${i * 30}ms`, onclick: () => this.openEditor(n) }, [
+        App.el('span', { html: Icons.notes(), style: 'width:20px;height:20px;color:var(--accent);flex-shrink:0;margin-top:2px' }),
         App.el('div', { style: 'flex:1' }, [
           App.el('div', { class: 'item-title' }, n.title || '(ohne Titel)'),
           App.el('div', { class: 'item-meta' }, preview),
         ]),
-        App.el('button', { class: 'icon-btn', onclick: (e) => { e.stopPropagation(); this.remove(n); } }, '🗑️'),
+        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => { e.stopPropagation(); this.remove(n, e); } }),
       ]));
-    }
+    });
   },
 
-  async remove(n) {
-    await DB.delete('notes', n.id);
-    App.refresh();
+  async remove(n, e) {
+    const el = e.currentTarget.closest('.item');
+    if (el) el.classList.add('removing');
+    setTimeout(async () => {
+      await DB.delete('notes', n.id);
+      App.refresh();
+    }, 220);
   },
 
   openEditor(note) {

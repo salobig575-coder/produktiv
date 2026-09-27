@@ -1,9 +1,10 @@
-const CACHE_NAME = 'produktiv-v1';
+const CACHE_NAME = 'produktiv-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './css/style.css',
+  './js/icons.js',
   './js/db.js',
   './js/app.js',
   './js/today.js',
