@@ -14,7 +14,7 @@ const WorkoutSessionView = {
     startedAt: null,
     elapsedSeconds: 0,
     finishedSummary: null,
-    settings: { showRIR: false, trackWarmupSets: false },
+    settings: { showRIR: false, trackWarmupSets: false, unilateralRestSeconds: 20 },
   },
 
   async lastPerformance(exerciseId, excludeSessionId) {
@@ -32,8 +32,14 @@ const WorkoutSessionView = {
   },
 
   async _readSettings() {
-    const [rir, warm] = await Promise.all([DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets')]);
-    return { showRIR: rir ? !!rir.value : false, trackWarmupSets: warm ? !!warm.value : false };
+    const [rir, warm, uniRest] = await Promise.all([
+      DB.get('settings', 'showRIR'), DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'unilateralRestSeconds'),
+    ]);
+    return {
+      showRIR: rir ? !!rir.value : false,
+      trackWarmupSets: warm ? !!warm.value : false,
+      unilateralRestSeconds: uniRest ? uniRest.value : 20,
+    };
   },
 
   async start(workout) {
@@ -43,19 +49,46 @@ const WorkoutSessionView = {
     for (const entry of workout.exercises) {
       const ex = await Exercises.byId(entry.exerciseId);
       const history = await this.lastPerformance(entry.exerciseId, sessionId);
-      const sets = entry.sets.map((planned, i) => {
-        const prev = history && history[i];
-        const baseReps = prev ? prev.reps : planned.reps;
-        const baseWeight = prev ? prev.weight : planned.weight;
-        const baseRir = prev && prev.rir != null ? prev.rir : null;
-        return {
-          targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
-          reps: null, weight: null,
-          rir: null, warmup: planned.warmup || false,
-          completed: false,
-        };
+      const unilateral = !!entry.unilateral;
+      let sets;
+      if (unilateral) {
+        const histL = (history || []).filter((set) => set.side === 'L');
+        const histR = (history || []).filter((set) => set.side === 'R');
+        sets = [];
+        entry.sets.forEach((planned, i) => {
+          for (const side of ['L', 'R']) {
+            const prev = (side === 'L' ? histL : histR)[i];
+            const baseReps = prev ? prev.reps : planned.reps;
+            const baseWeight = prev ? prev.weight : planned.weight;
+            const baseRir = prev && prev.rir != null ? prev.rir : null;
+            sets.push({
+              side, round: i + 1,
+              targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
+              reps: null, weight: null, rir: null, warmup: planned.warmup || false,
+              completed: false,
+            });
+          }
+        });
+      } else {
+        sets = entry.sets.map((planned, i) => {
+          const prev = history && history[i];
+          const baseReps = prev ? prev.reps : planned.reps;
+          const baseWeight = prev ? prev.weight : planned.weight;
+          const baseRir = prev && prev.rir != null ? prev.rir : null;
+          return {
+            targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
+            reps: null, weight: null,
+            rir: null, warmup: planned.warmup || false,
+            completed: false,
+          };
+        });
+      }
+      exercises.push({
+        exerciseId: entry.exerciseId, exerciseName: ex ? ex.name : '(gelöschte Übung)',
+        restSeconds: entry.restSeconds || 90, unilateral,
+        unilateralRestSeconds: entry.unilateralRestSeconds != null ? entry.unilateralRestSeconds : sessSettings.unilateralRestSeconds,
+        sets,
       });
-      exercises.push({ exerciseId: entry.exerciseId, exerciseName: ex ? ex.name : '(gelöschte Übung)', restSeconds: entry.restSeconds || 90, sets });
     }
     this._begin(sessionId, workout.id, workout.name, exercises, workout.tag || '', sessSettings);
   },
@@ -125,14 +158,18 @@ const WorkoutSessionView = {
 
   async completeSet(exIndex, setIndex) {
     const s = this.state;
-    const set = s.exercises[exIndex].sets[setIndex];
+    const ex = s.exercises[exIndex];
+    const set = ex.sets[setIndex];
     if (set.reps == null) set.reps = set.targetReps ?? 0;
     if (set.weight == null) set.weight = set.targetWeight ?? 0;
     set.completed = true;
 
     if (this.allDone()) { await this.finish(); return; }
 
-    const restSeconds = s.exercises[exIndex].restSeconds || 90;
+    let restSeconds = ex.restSeconds || 90;
+    if (ex.unilateral && set.side === 'L') {
+      restSeconds = ex.unilateralRestSeconds != null ? ex.unilateralRestSeconds : 20;
+    }
     s.phase = 'resting';
     s.restSecondsLeft = restSeconds;
     s.restTotal = restSeconds;
@@ -337,7 +374,11 @@ const WorkoutSessionView = {
 
   renderExercise(ex, exIndex) {
     const box = App.el('div', { class: 'card' });
-    box.appendChild(App.el('h2', {}, `Satz ${ex.sets.filter((s) => s.completed).length + 1 <= ex.sets.length ? ex.sets.filter((s) => s.completed).length + 1 : ex.sets.length} von ${ex.sets.length}`));
+    const unit = ex.unilateral ? 2 : 1;
+    const totalUnits = ex.sets.length / unit;
+    const doneCount = ex.sets.filter((s) => s.completed).length;
+    const currentUnit = Math.min(Math.floor(doneCount / unit) + 1, totalUnits);
+    box.appendChild(App.el('h2', {}, `Satz ${currentUnit} von ${totalUnits}`));
 
     const showRIR = !!(this.state.settings && this.state.settings.showRIR);
     const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
@@ -393,7 +434,7 @@ const WorkoutSessionView = {
             this.completeSet(exIndex, si);
           },
         }),
-        App.el('div', { class: 'set-label' }, `Satz ${si + 1}`),
+        App.el('div', { class: 'set-label' }, ex.unilateral ? `${set.side}${set.round}` : `Satz ${si + 1}`),
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [weightInput, weightDelta]),
         App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [repsInput, repsDelta]),
       ];

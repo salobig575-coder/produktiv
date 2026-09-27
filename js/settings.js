@@ -13,18 +13,24 @@ const SettingsView = {
       },
     }, label);
 
-    const [weightRow, rirRow, warmRow, restRow] = await Promise.all([
+    const [weightRow, rirRow, warmRow, restRow, uniRestRow] = await Promise.all([
       DB.get('settings', 'weightTrackingEnabled'), DB.get('settings', 'showRIR'),
       DB.get('settings', 'trackWarmupSets'), DB.get('settings', 'defaultRestSeconds'),
+      DB.get('settings', 'unilateralRestSeconds'),
     ]);
     const weightEnabled = weightRow ? weightRow.value !== false : true;
     const showRIR = rirRow ? !!rirRow.value : false;
     const trackWarmup = warmRow ? !!warmRow.value : false;
     const restSeconds = restRow ? restRow.value : 90;
+    const uniRestSeconds = uniRestRow ? uniRestRow.value : 20;
 
     const restSelect = App.el('select', {}, [30, 45, 60, 90, 120, 150, 180, 240].map((s) => App.el('option', { value: s }, `${s} Sekunden`)));
     restSelect.value = String(restSeconds);
     restSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'defaultRestSeconds', value: Number(e.target.value) }); });
+
+    const uniRestSelect = App.el('select', {}, [10, 15, 20, 30, 45, 60, 90].map((s) => App.el('option', { value: s }, `${s} Sekunden`)));
+    uniRestSelect.value = String(uniRestSeconds);
+    uniRestSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'unilateralRestSeconds', value: Number(e.target.value) }); });
 
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
@@ -47,7 +53,8 @@ const SettingsView = {
         App.switchRow('Aufwärmsätze verfolgen', 'Erlaubt, Sätze als Aufwärmsatz zu markieren — zählen nicht zu Volumen & Rekorden.', trackWarmup, async (val) => {
           await DB.put('settings', { key: 'trackWarmupSets', value: val });
         }),
-        App.el('div', { class: 'field', style: 'margin-top:10px;margin-bottom:0' }, [App.el('label', {}, 'Standard-Pausenzeit'), restSelect]),
+        App.el('div', { class: 'field', style: 'margin-top:10px' }, [App.el('label', {}, 'Standard-Pausenzeit'), restSelect]),
+        App.el('div', { class: 'field', style: 'margin-bottom:0' }, [App.el('label', {}, 'Standard-Pausenzeit (unilateral)'), uniRestSelect, App.el('p', { class: 'tag', style: 'margin-top:4px' }, 'Pause nach der ersten Seite bei einseitigen Übungen (L/R).')]),
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.download(), style: 'width:14px;height:14px' }), 'Backup']),

@@ -258,6 +258,10 @@ const WorkoutsView = {
         App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { w.exercises.splice(i, 1); expanded.delete(i); renderBody(); } }),
       ]);
       item.appendChild(controls);
+      item.appendChild(App.el('button', {
+        class: 'gradient-border-btn',
+        onclick: () => Exercises.showPersonalRecords(entry.exerciseId, ex ? ex.name : ''),
+      }, 'Persönliche Rekorde'));
       const setsBox = App.el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
       entry.sets.forEach((set, si) => {
         const repsInput = App.el('input', { type: 'number', class: 'set-input', value: set.reps, style: 'text-align:center', inputmode: 'numeric' });
@@ -286,6 +290,8 @@ const WorkoutsView = {
       });
       item.appendChild(setsBox);
       item.appendChild(App.el('button', { class: 'btn secondary', onclick: () => { entry.sets.push({ reps: 10, weight: entry.sets.at(-1)?.weight || 0, rir: null, warmup: false }); renderBody(); } }, '+ Satz'));
+
+      item.appendChild(App.switchRow('Einseitige Übung (unilateral)', 'Sätze werden pro Seite (L/R) einzeln erfasst, z.B. L1/R1.', !!entry.unilateral, (val) => { entry.unilateral = val; renderBody(); }));
 
       const restInput = App.el('input', { type: 'number', value: entry.restSeconds ?? opts.defaultRestSeconds, style: 'width:80px;text-align:center' });
       restInput.addEventListener('input', (e) => { entry.restSeconds = Number(e.target.value) || 0; });

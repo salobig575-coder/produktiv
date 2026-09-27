@@ -122,6 +122,47 @@ const Exercises = {
 
   invalidate() { this._cache = null; },
 
+  async personalRecords(exerciseId) {
+    const sessions = await DB.getAll('workoutSessions');
+    const best = new Map();
+    for (const s of sessions) {
+      if (!s.finishedAt) continue;
+      const ex = s.exercises.find((e) => e.exerciseId === exerciseId);
+      if (!ex) continue;
+      for (const set of ex.sets) {
+        if (!set.completed || set.warmup) continue;
+        if (!set.reps || !set.weight) continue;
+        const cur = best.get(set.reps);
+        if (!cur || set.weight > cur.weight) best.set(set.reps, { weight: set.weight, date: s.finishedAt });
+      }
+    }
+    return [...best.entries()].map(([reps, v]) => ({ reps, weight: v.weight, date: v.date })).sort((a, b) => a.reps - b.reps);
+  },
+
+  async showPersonalRecords(exerciseId, exerciseName) {
+    const records = await this.personalRecords(exerciseId);
+    const rows = records.length
+      ? records.map((r) => App.el('div', { class: 'pr-table-row' }, [
+          App.el('span', {}, new Date(r.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })),
+          App.el('span', {}, String(r.weight)),
+          App.el('span', {}, String(r.reps)),
+        ]))
+      : [App.el('div', { class: 'empty', style: 'padding:20px 10px' }, 'Noch keine abgeschlossenen Sätze für diese Übung.')];
+
+    const content = App.el('div', {}, [
+      App.el('h3', {}, 'Persönliche Rekorde'),
+      App.el('div', { class: 'tag', style: 'margin-top:-8px;margin-bottom:14px' }, exerciseName || ''),
+      App.el('div', { class: 'pr-table-frame' }, [
+        App.el('div', { class: 'pr-table-inner' }, [
+          App.el('div', { class: 'pr-table-row head' }, [App.el('span', {}, 'Datum'), App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.')]),
+          ...rows,
+        ]),
+      ]),
+      App.el('button', { class: 'btn secondary', style: 'margin-top:14px', onclick: () => App.closeModal() }, 'Schließen'),
+    ]);
+    App.showModal(content);
+  },
+
   youTubeEmbed(url) {
     if (!url) return null;
     const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/);

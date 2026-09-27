@@ -866,6 +866,65 @@ input.set-input:disabled { opacity: .65; }
   max-width: 100%;
 }
 
+/* ---------- Persönliche Rekorde ---------- */
+.gradient-border-btn {
+  position: relative;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  isolation: isolate;
+}
+.gradient-border-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(90deg, var(--success), #3b82f6, var(--danger));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.pr-table-frame {
+  padding: 1.5px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--success), #3b82f6, var(--danger));
+}
+.pr-table-inner {
+  background: var(--surface);
+  border-radius: calc(var(--radius-sm) - 1.5px);
+  overflow: hidden;
+}
+.pr-table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.7fr;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pr-table-row:last-child { border-bottom: none; }
+.pr-table-row span:nth-child(2) { text-align: center; }
+.pr-table-row span:nth-child(3) { text-align: right; }
+.pr-table-row.head {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-dim);
+}
+
 .card.pr-glow { animation: prGlow 1.4s var(--ease) both; }
 @keyframes prGlow {
   0% { box-shadow: var(--shadow); }
