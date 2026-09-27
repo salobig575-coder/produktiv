@@ -260,9 +260,9 @@ const WorkoutsView = {
       item.appendChild(controls);
       const setsBox = App.el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
       entry.sets.forEach((set, si) => {
-        const repsInput = App.el('input', { type: 'number', value: set.reps, style: 'text-align:center', inputmode: 'numeric' });
+        const repsInput = App.el('input', { type: 'number', class: 'set-input', value: set.reps, style: 'text-align:center', inputmode: 'numeric' });
         repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; });
-        const weightInput = App.el('input', { type: 'number', value: set.weight, step: '0.5', style: 'text-align:center', inputmode: 'decimal' });
+        const weightInput = App.el('input', { type: 'number', class: 'set-input', value: set.weight, step: '0.5', style: 'text-align:center', inputmode: 'decimal' });
         weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; });
 
         const row = [
@@ -271,7 +271,7 @@ const WorkoutsView = {
           weightInput, App.el('span', { class: 'tag' }, 'kg'),
         ];
         if (opts.showRIR) {
-          const rirInput = App.el('input', { type: 'number', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:52px', inputmode: 'numeric' });
+          const rirInput = App.el('input', { type: 'number', class: 'set-input', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:52px', inputmode: 'numeric' });
           rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
           row.push(rirInput, App.el('span', { class: 'tag' }, 'RIR'));
         }

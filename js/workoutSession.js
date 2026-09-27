@@ -24,7 +24,9 @@ const WorkoutSessionView = {
       .sort((a, b) => b.finishedAt - a.finishedAt);
     for (const s of past) {
       const ex = s.exercises.find((e) => e.exerciseId === exerciseId);
-      if (ex && ex.sets.some((set) => set.completed)) return ex.sets.filter((set) => set.completed);
+      if (!ex) continue;
+      const working = ex.sets.filter((set) => set.completed && !set.warmup);
+      if (working.length) return working;
     }
     return null;
   },
@@ -45,9 +47,10 @@ const WorkoutSessionView = {
         const prev = history && history[i];
         const baseReps = prev ? prev.reps : planned.reps;
         const baseWeight = prev ? prev.weight : planned.weight;
+        const baseRir = prev && prev.rir != null ? prev.rir : null;
         return {
-          targetReps: baseReps, targetWeight: baseWeight,
-          reps: baseReps, weight: baseWeight,
+          targetReps: baseReps, targetWeight: baseWeight, targetRir: baseRir,
+          reps: null, weight: null,
           rir: null, warmup: planned.warmup || false,
           completed: false,
         };
@@ -123,6 +126,8 @@ const WorkoutSessionView = {
   async completeSet(exIndex, setIndex) {
     const s = this.state;
     const set = s.exercises[exIndex].sets[setIndex];
+    if (set.reps == null) set.reps = set.targetReps ?? 0;
+    if (set.weight == null) set.weight = set.targetWeight ?? 0;
     set.completed = true;
 
     if (this.allDone()) { await this.finish(); return; }
@@ -168,12 +173,17 @@ const WorkoutSessionView = {
         const thumb = ex.images && ex.images[0]
           ? App.el('img', { src: ex.images[0], style: 'width:40px;height:40px;object-fit:cover;border-radius:9px;flex-shrink:0;background:var(--surface-2)' })
           : null;
-        listBox.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: () => {
-          this.state.exercises.push({ exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, sets: [
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
-            { targetReps: 10, targetWeight: 0, reps: 10, weight: 0, rir: null, warmup: false, completed: false },
-          ] });
+        listBox.appendChild(App.el('div', { class: 'item', style: 'cursor:pointer', onclick: async () => {
+          const history = await this.lastPerformance(ex.id, this.state.sessionId);
+          const sets = [0, 1, 2].map((i) => {
+            const prev = history && history[i];
+            return {
+              targetReps: prev ? prev.reps : 10, targetWeight: prev ? prev.weight : 0,
+              targetRir: prev && prev.rir != null ? prev.rir : null,
+              reps: null, weight: null, rir: null, warmup: false, completed: false,
+            };
+          });
+          this.state.exercises.push({ exerciseId: ex.id, exerciseName: ex.name, restSeconds: 90, sets });
           this.state.currentExerciseIndex = this.state.exercises.length - 1;
           App.closeModal();
           App.refresh();
@@ -329,27 +339,52 @@ const WorkoutSessionView = {
     const box = App.el('div', { class: 'card' });
     box.appendChild(App.el('h2', {}, `Satz ${ex.sets.filter((s) => s.completed).length + 1 <= ex.sets.length ? ex.sets.filter((s) => s.completed).length + 1 : ex.sets.length} von ${ex.sets.length}`));
 
-    const list = App.el('div', { class: 'list' });
-    const updateDelta = (span, diff) => {
-      span.innerHTML = '';
-      const d = App.delta(diff);
-      if (d) span.appendChild(d);
-    };
     const showRIR = !!(this.state.settings && this.state.settings.showRIR);
     const trackWarmup = !!(this.state.settings && this.state.settings.trackWarmupSets);
+    const cols = ['30px', '52px', '1fr', '1fr'];
+    if (showRIR) cols.push('56px');
+    if (trackWarmup) cols.push('30px');
+    const gridStyle = `display:grid;grid-template-columns:${cols.join(' ')};gap:8px;align-items:center;`;
+
+    const header = App.el('div', { class: 'set-row-header', style: gridStyle }, [
+      App.el('span', {}, ''), App.el('span', {}, ''),
+      App.el('span', {}, 'Gewicht'), App.el('span', {}, 'Wdh.'),
+      showRIR ? App.el('span', {}, 'RIR') : null,
+      trackWarmup ? App.el('span', {}, '') : null,
+    ]);
+
+    const list = App.el('div', { class: 'list' }, [header]);
+    const updateDelta = (span, actual, target) => {
+      span.innerHTML = '';
+      if (actual == null) return;
+      const d = App.delta(actual - target);
+      if (d) span.appendChild(d);
+    };
 
     ex.sets.forEach((set, si) => {
-      const repsInput = App.el('input', { type: 'number', value: set.reps, style: 'text-align:center', disabled: set.completed });
-      const repsDelta = App.el('span', { style: 'display:inline-block;min-width:26px' });
-      updateDelta(repsDelta, set.reps - set.targetReps);
-      repsInput.addEventListener('input', (e) => { set.reps = Number(e.target.value) || 0; updateDelta(repsDelta, set.reps - set.targetReps); });
-
-      const weightInput = App.el('input', { type: 'number', value: set.weight, step: '0.5', style: 'text-align:center', disabled: set.completed });
+      const weightInput = App.el('input', {
+        type: 'number', class: 'set-input', value: set.weight ?? '', step: '0.5', style: 'text-align:center',
+        placeholder: set.targetWeight != null ? String(set.targetWeight) : '', disabled: set.completed,
+      });
       const weightDelta = App.el('span', { style: 'display:inline-block;min-width:32px' });
-      updateDelta(weightDelta, set.weight - set.targetWeight);
-      weightInput.addEventListener('input', (e) => { set.weight = Number(e.target.value) || 0; updateDelta(weightDelta, set.weight - set.targetWeight); });
+      updateDelta(weightDelta, set.weight, set.targetWeight);
+      weightInput.addEventListener('input', (e) => {
+        set.weight = e.target.value === '' ? null : Number(e.target.value);
+        updateDelta(weightDelta, set.weight, set.targetWeight);
+      });
 
-      const row = [
+      const repsInput = App.el('input', {
+        type: 'number', class: 'set-input', value: set.reps ?? '', style: 'text-align:center',
+        placeholder: set.targetReps != null ? String(set.targetReps) : '', disabled: set.completed,
+      });
+      const repsDelta = App.el('span', { style: 'display:inline-block;min-width:26px' });
+      updateDelta(repsDelta, set.reps, set.targetReps);
+      repsInput.addEventListener('input', (e) => {
+        set.reps = e.target.value === '' ? null : Number(e.target.value);
+        updateDelta(repsDelta, set.reps, set.targetReps);
+      });
+
+      const cells = [
         App.el('button', {
           class: 'checkbox' + (set.completed ? ' checked' : ''), html: Icons.check(),
           onclick: (e) => {
@@ -358,23 +393,26 @@ const WorkoutSessionView = {
             this.completeSet(exIndex, si);
           },
         }),
-        App.el('span', { class: 'tag', style: 'width:44px' }, `Satz ${si + 1}`),
-        weightInput, weightDelta, App.el('span', { class: 'tag' }, 'kg'),
-        repsInput, repsDelta, App.el('span', { class: 'tag' }, 'Wdh'),
+        App.el('div', { class: 'set-label' }, `Satz ${si + 1}`),
+        App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [weightInput, weightDelta]),
+        App.el('div', { style: 'display:flex;align-items:center;gap:4px' }, [repsInput, repsDelta]),
       ];
       if (showRIR) {
-        const rirInput = App.el('input', { type: 'number', value: set.rir ?? '', placeholder: '–', style: 'text-align:center;width:48px', disabled: set.completed });
+        const rirInput = App.el('input', {
+          type: 'number', class: 'set-input', value: set.rir ?? '', style: 'text-align:center',
+          placeholder: set.targetRir != null ? String(set.targetRir) : '–', disabled: set.completed,
+        });
         rirInput.addEventListener('input', (e) => { set.rir = e.target.value === '' ? null : Number(e.target.value); });
-        row.push(rirInput, App.el('span', { class: 'tag' }, 'RIR'));
+        cells.push(rirInput);
       }
       if (trackWarmup) {
-        row.push(App.el('button', {
+        cells.push(App.el('button', {
           class: 'icon-btn' + (set.warmup ? ' active-warmup' : ''), title: 'Aufwärmsatz',
           html: Icons.flame(), onclick: () => { set.warmup = !set.warmup; App.refresh(); },
         }));
       }
 
-      list.appendChild(App.el('div', { class: 'item' + (set.completed ? ' done' : '') + (set.warmup ? ' is-warmup' : ''), style: 'flex-wrap:wrap' }, row));
+      list.appendChild(App.el('div', { class: 'set-row' + (set.completed ? ' done' : '') + (set.warmup ? ' is-warmup' : ''), style: gridStyle }, cells));
     });
     box.appendChild(list);
     return box;

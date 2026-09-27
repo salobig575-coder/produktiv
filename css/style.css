@@ -724,6 +724,34 @@ nav.bottomnav button:active { transform: scale(.9); }
 .icon-btn.active-warmup { color: var(--warn); background: rgba(var(--warn-rgb), .16); }
 .item.is-warmup { border-left: 3px solid var(--warn); }
 
+/* ---------- Set rows (live workout tracking) ---------- */
+.set-row-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 0 2px 8px;
+}
+.set-row {
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  transition: opacity .2s;
+}
+.set-row:last-child { border-bottom: none; }
+.set-row.done { opacity: .55; }
+.set-row.is-warmup { border-left: 3px solid var(--warn); padding-left: 6px; }
+.set-label { font-size: 13px; font-weight: 800; }
+
+input.set-input {
+  background: #ffffff;
+  color: #10131c;
+  border: 1px solid rgba(0, 0, 0, .1);
+}
+input.set-input:focus { border-color: var(--accent); background: #ffffff; }
+input.set-input::placeholder { color: #9aa0ad; opacity: 1; }
+input.set-input:disabled { opacity: .65; }
+
 /* ---------- Date strip (consistency view) ---------- */
 .date-strip {
   display: flex;
