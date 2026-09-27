@@ -679,7 +679,7 @@ nav.bottomnav button:active { transform: scale(.9); }
   text-align: center;
   transition: transform .2s var(--ease-spring);
 }
-.stat .num { font-size: 24px; font-weight: 800; }
+.stat .num { font-size: 28px; font-weight: 800; }
 .stat .lbl { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-weight: 600; }
 
 .tag { color: var(--text-dim); font-size: 12px; }
