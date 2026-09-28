@@ -145,6 +145,32 @@ const WorkoutsView = {
     }, 220);
   },
 
+  // Bottom sheet before starting: title, tag, numbered exercise list, start button.
+  async openPreview(w) {
+    const setsEstimate = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+    const list = App.el('div', { class: 'preview-list' });
+    for (let i = 0; i < w.exercises.length; i++) {
+      const ex = await Exercises.byId(w.exercises[i].exerciseId);
+      const n = w.exercises[i].sets.length;
+      list.appendChild(App.el('div', { class: 'preview-row' }, [
+        App.el('span', { class: 'num-circle' }, String(i + 1)),
+        App.el('div', { class: 'preview-name' }, ex ? ex.name : '(gelöschte Übung)'),
+        App.el('div', { class: 'preview-sets' }, n ? `${n} ${n === 1 ? 'Satz' : 'Sätze'}` : '— Sätze'),
+      ]));
+    }
+    const content = App.el('div', {}, [
+      App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+        App.el('h3', { style: 'margin:0;font-size:24px' }, w.name || '(ohne Namen)'),
+        w.tag ? App.el('span', { class: 'pill' }, w.tag) : null,
+      ]),
+      App.el('div', { class: 'item-meta', style: 'font-size:15px;margin:6px 0 14px' }, `${w.exercises.length} Übungen • ~${setsEstimate} Sätze`),
+      App.el('div', { class: 'set-row-header', style: 'border-top:1px solid var(--border);padding-top:14px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-size:12px' }, 'Übungen'),
+      list,
+      App.el('button', { class: 'btn', style: 'margin-top:10px', onclick: () => { App.closeModal(); WorkoutSessionView.start(w); } }, 'Workout starten'),
+    ]);
+    App.showModal(content);
+  },
+
   // Reusable "choose a workout to start" flow — search + tag tabs + start buttons.
   openStartPicker() {
     let query = '';
@@ -169,7 +195,7 @@ const WorkoutsView = {
       for (const w of items) {
         const setsEstimate = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
         list.appendChild(App.el('div', { class: 'item', style: 'flex-direction:column;align-items:stretch;gap:8px' }, [
-          App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+          App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start;cursor:pointer', onclick: () => this.openPreview(w) }, [
             App.el('div', { style: 'flex:1;min-width:0' }, [
               App.el('div', { class: 'item-title' }, w.name || '(ohne Namen)'),
               App.el('div', { class: 'item-meta' }, `${w.exercises.length} Übungen · ~${setsEstimate} Sätze`),

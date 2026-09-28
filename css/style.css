@@ -756,6 +756,22 @@ input.set-input:focus { border-color: var(--accent); background: #ffffff; }
 input.set-input::placeholder { color: #9aa0ad; opacity: 1; }
 input.set-input:disabled { opacity: .65; }
 
+/* ---------- Workout preview sheet ---------- */
+.preview-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.preview-name { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; }
+.preview-sets { font-size: 14px; color: var(--text-dim); white-space: nowrap; }
+.num-circle {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface-2); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;
+}
+
+/* ---------- 2x2 stat tiles (label on top, big value below) ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.stat-tile .lbl { font-size: 17px; font-weight: 800; }
+.stat-tile .num { font-size: 30px; font-weight: 800; margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
+
 /* ---------- Position chips (exercise order, e.g. "1A") ---------- */
 .pos-chip {
   flex-shrink: 0;

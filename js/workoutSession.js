@@ -571,19 +571,17 @@ const WorkoutSessionView = {
       ]));
     }
 
-    const mkStat = (value, label, diff) => App.el('div', { class: 'stat' }, [
-      App.el('div', { class: 'num' }, [String(value), diff != null ? App.delta(diff) : null]),
+    const mkStat = (value, label, diff) => App.el('div', { class: 'stat-tile' }, [
       App.el('div', { class: 'lbl' }, label),
+      App.el('div', { class: 'num' }, [String(value), diff != null ? App.delta(diff) : null]),
     ]);
     const prevTotalSets = prevSession ? prevSession.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0) : null;
     const prevTotalReps = prevSession ? prevSession.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed && !s.warmup).reduce((s2, s) => s2 + (s.reps || 0), 0), 0) : null;
-    content.appendChild(App.el('div', { class: 'card' }, [
-      App.el('div', { class: 'stat-row' }, [
-        mkStat(session.exerciseCount ?? session.exercises.length, 'Übungen', prevSession ? (session.exerciseCount ?? session.exercises.length) - (prevSession.exerciseCount ?? prevSession.exercises.length) : null),
-        mkStat(totalSets, 'Sätze', prevSession ? totalSets - prevTotalSets : null),
-        mkStat(totalReps, 'Wdh.', prevSession ? totalReps - prevTotalReps : null),
-        mkStat(Math.round(session.totalVolume || 0), 'Volumen (kg)', prevSession ? Math.round((session.totalVolume || 0) - (prevSession.totalVolume || 0)) : null),
-      ]),
+    content.appendChild(App.el('div', { class: 'stat-grid' }, [
+      mkStat(session.exerciseCount ?? session.exercises.length, 'Übungen', prevSession ? (session.exerciseCount ?? session.exercises.length) - (prevSession.exerciseCount ?? prevSession.exercises.length) : null),
+      mkStat(totalSets, 'Sätze', prevSession ? totalSets - prevTotalSets : null),
+      mkStat(totalReps, 'Wdh.', prevSession ? totalReps - prevTotalReps : null),
+      mkStat(Math.round(session.totalVolume || 0), 'Volumen (kg)', prevSession ? Math.round((session.totalVolume || 0) - (prevSession.totalVolume || 0)) : null),
     ]));
 
     if (typeof BodyMetrics !== 'undefined' && await BodyMetrics.isEnabled()) {
