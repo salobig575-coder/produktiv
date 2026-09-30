@@ -175,6 +175,15 @@ const SettingsView = {
         fileInput,
       ]),
       App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'App aktualisieren']),
+        App.el('p', { class: 'tag' }, 'Zeigt dir etwas Altes an? Das leert nur den Zwischenspeicher der App. Deine Daten bleiben erhalten.'),
+        App.el('button', { class: 'btn secondary', style: 'margin-bottom:0', onclick: async () => {
+          if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+          if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+          location.reload();
+        } }, 'Neueste Version laden'),
+      ]),
+      App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'App installieren']),
         App.el('p', { class: 'tag' }, 'Am Handy: Browser-Menü → „Zum Startbildschirm hinzufügen“. Am PC: Adressleiste → Install-Symbol.'),
       ]),
