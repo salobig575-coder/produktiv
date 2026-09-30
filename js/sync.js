@@ -6,6 +6,7 @@ const Sync = {
     'bodyMetrics', 'goals', 'cardioSessions', 'stepLogs', 'sleepLogs', 'gyms', 'events'], // Fotos (Blobs) bleiben lokal
   LOCAL_SETTINGS: ['aiKey', 'syncSession', 'syncUrl', 'syncKey', 'syncCursor'],
   status: 'aus',
+  enabled: false, // erst nach Anmeldung wird mitgeschrieben (spart Arbeit; die Anmeldung markiert alles)
   _timer: null,
 
   keyOf(store, obj) { return store === 'settings' ? obj.key : obj.id; },
@@ -25,6 +26,7 @@ const Sync = {
     try { localStorage.setItem('syncDirty', JSON.stringify(d)); } catch (e) {}
   },
   mark(store, id, deleted) {
+    if (!this.enabled) return;
     const d = this.dirty();
     d[`${store}\u0001${id}`] = { t: Date.now(), del: !!deleted };
     this.saveDirty(d);
@@ -47,6 +49,7 @@ const Sync = {
       return r;
     };
     DB.importAll = async (payload) => { await imp(payload); await this.markAll(); };
+    this.cfg().then((c) => { this.enabled = !!c.session; }).catch(() => {});
     window.addEventListener('online', () => this.schedule(500));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.schedule(500); });
     this.schedule(1500);
@@ -80,6 +83,7 @@ const Sync = {
     if (!res.ok) throw new Error(j.msg || j.error_description || j.message || `Fehler ${res.status}`);
     if (!j.access_token) throw new Error('Konto angelegt – bitte zuerst die Bestätigungs-E-Mail öffnen (oder in Supabase „Confirm email“ ausschalten) und dann anmelden.');
     await this.setLocal('syncSession', this.toSession(j));
+    this.enabled = true;
     if (!c.cursor) await this.markAll(); // erste Anmeldung: vorhandene Daten hochladen
     this.schedule(200);
   },
@@ -89,6 +93,7 @@ const Sync = {
   },
 
   async logout() {
+    this.enabled = false;
     await this.setLocal('syncSession', null);
     await this.setLocal('syncCursor', null);
     this.status = 'aus';

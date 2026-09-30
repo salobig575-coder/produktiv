@@ -10,6 +10,8 @@ Persönlicher Planer, Fokus-Timer und Fitness-Tracker in einer App. Läuft als P
 
 Automatik im Planer: Schnelleingabe in Alltagssprache, „Tag planen“ (Vorschlag mit Bestätigung), Umplanung verpasster Blöcke, Überlastungshinweis, lernende Zeitschätzung, Feiertage, Erinnerungen, optionale KI (Aufgaben zerlegen, Wochenfazit).
 
+Gesten (iPhone): Zeile nach rechts wischen = erledigt, nach links = Morgen/Löschen, lang drücken = Aktionsmenü, oben nach unten ziehen = aktualisieren/synchronisieren, vom Bildschirmrand wischen = Tab wechseln bzw. Fenster schließen, Fenster nach unten ziehen = schließen. Blöcke im Kalender lang drücken und ziehen = verschieben.
+
 Tastenkürzel (Mac/PC): `1`/`2`/`3` Bereiche, `/` oder Strg/Cmd+K Suche, im Kalender `←` `→` `t` `d` `w` `n`, `Esc` schließt Fenster.
 
 ## Entwickeln
@@ -36,6 +38,13 @@ Tests (keine Abhängigkeiten): `npm test`
 | `js/sync.js` | Geräte-Sync über Supabase |
 | `js/ai.js`, `js/native.js` | Optionale KI, Brücke zur nativen Hülle |
 | `sw.js` | Service Worker (Cache-Name bei jeder Auslieferung erhöhen) |
+
+## Fehlerbehebung
+
+- **Alte Version wird angezeigt:** Einstellungen → „Neueste Version laden“ oder `reset.html` öffnen (leert nur den Zwischenspeicher, Daten bleiben).
+- **Ladebildschirm hängt / roter Hinweis zur Datenbank:** Alle Produktiv-Fenster schließen (iPhone: im App-Wechsler nach oben wischen) und neu öffnen.
+- **Fehlerkarte „Hier ist etwas schiefgegangen“:** „Neu laden“, sonst „Zwischenspeicher leeren & neu laden“.
+- **Daten sichern:** Einstellungen → Backup exportieren (oder Sync einrichten).
 
 ## Weiterführende Anleitungen
 

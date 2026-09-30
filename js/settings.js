@@ -47,8 +47,19 @@ const SettingsView = {
     const ps = await Planner.settings();
     const startInput = App.el('input', { type: 'time', value: Planner.fmt(ps.start) });
     const endInput = App.el('input', { type: 'time', value: Planner.fmt(ps.end) });
-    startInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerStart', value: Planner.parseTime(startInput.value) }); });
-    endInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerEnd', value: Planner.parseTime(endInput.value) }); });
+    // Das Tagesfenster muss sinnvoll sein (mind. 2 Stunden), sonst bleibt der alte Wert
+    const saveWindow = (which) => async () => {
+      const a = Planner.parseTime(startInput.value), b = Planner.parseTime(endInput.value);
+      if (!startInput.value || !endInput.value || b - a < 120) {
+        startInput.value = Planner.fmt(ps.start); endInput.value = Planner.fmt(ps.end);
+        Planner.toast('Der Tag muss mindestens 2 Stunden lang sein.');
+        return;
+      }
+      ps.start = a; ps.end = b;
+      await DB.put('settings', { key: which === 'start' ? 'plannerStart' : 'plannerEnd', value: which === 'start' ? a : b });
+    };
+    startInput.addEventListener('change', saveWindow('start'));
+    endInput.addEventListener('change', saveWindow('end'));
     const holSelect = App.el('select', {}, Object.entries(Holidays.STATES).map(([k, l]) => App.el('option', { value: k }, l)));
     holSelect.value = ps.holidays || '';
     holSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'holidayState', value: e.target.value }); });
@@ -213,7 +224,7 @@ const SettingsView = {
       App.refresh();
       Planner.toast(`${events.length} Termine importiert${skipped ? `, ${skipped} übersprungen` : ''}.`);
     } catch (e) {
-      alert('Kalender konnte nicht gelesen werden: ' + e.message);
+      Planner.toast('Kalender konnte nicht gelesen werden: ' + e.message);
     }
   },
 
@@ -236,11 +247,13 @@ const SettingsView = {
     try {
       const text = await file.text();
       const payload = JSON.parse(text);
+      if (!payload || typeof payload.data !== 'object') throw new Error('Das ist keine Produktiv-Sicherung.');
       await DB.importAll(payload);
+      Planner.toast('Backup importiert.');
       App.closeModal();
       App.refresh();
     } catch (e) {
-      alert('Backup konnte nicht gelesen werden: ' + e.message);
+      Planner.toast('Backup konnte nicht gelesen werden: ' + e.message);
     }
   },
 };

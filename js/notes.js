@@ -62,6 +62,7 @@ const NotesView = {
     setTimeout(async () => {
       await DB.delete('notes', n.id);
       App.refresh();
+      Planner.toast('Notiz gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('notes', n); App.refresh(); } });
     }, 220);
   },
 

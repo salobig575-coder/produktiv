@@ -147,6 +147,29 @@ const Planner = {
     return this.freeSlots(items, s, date).reduce((sum, g) => sum + (g[1] - g[0]), 0);
   },
 
+  // Aufgaben mit Fälligkeit, die bei der aktuellen Auslastung voraussichtlich nicht mehr rechtzeitig passen.
+  // Verfahren: nach Fälligkeit sortieren, Dauer aufsummieren und mit der freien Zeit (85 %) bis zum jeweiligen Tag vergleichen.
+  atRisk(data) {
+    const today = App.todayStr(), s = data.s;
+    const open = data.tasks.filter((t) => !t.done && t.dueDate && t.dueDate >= today && t.planStart == null)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.createdAt || 0) - (b.createdAt || 0));
+    const risk = new Set();
+    if (!open.length) return risk;
+    const horizon = [open[open.length - 1].dueDate, this.addDays(today, 30)].sort()[0];
+    const cap = {};
+    let cum = 0;
+    for (let d = today; d <= horizon; d = this.addDays(d, 1)) {
+      cum += Math.max(0, this.freeMinutes(this.dayItems(d, data), s, d) * 0.85);
+      cap[d] = cum;
+    }
+    let demand = 0;
+    for (const t of open) {
+      demand += t.duration || 30;
+      if (demand > (cap[t.dueDate] != null ? cap[t.dueDate] : cum)) risk.add(t.id);
+    }
+    return risk;
+  },
+
   // ---------- Auto-Planung ----------
   inbox(tasks) {
     return tasks.filter((t) => !t.done && t.planStart == null);
@@ -344,6 +367,10 @@ const Planner = {
         msg: ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`,
       });
     }
+    for (const ev of data.events) {
+      if ((ev.kind || 'event') !== 'focus' || !this.occursOn(ev, date)) continue;
+      list.push({ key: `focus:${ev.id}:${date}`, at: ev.start, until: ev.start + 15, msg: `Fokus-Block „${ev.title}“ beginnt`, focus: ev });
+    }
     for (const t of data.tasks) {
       if (t.done || t.planDate !== date || t.planStart == null) continue;
       list.push({ key: `${t.id}:${date}`, at: t.planStart - 5, until: t.planStart + 1, msg: `${t.title} ist gleich dran (${this.fmt(t.planStart)})` });
@@ -363,7 +390,12 @@ const Planner = {
     for (const r of this.reminderList(data, today)) {
       if (fired[r.key] || now < r.at || now >= r.until) continue;
       fired[r.key] = 1;
-      this.toast(r.msg);
+      if (r.focus) {
+        this.toast(r.msg, { label: 'Starten', fn: () => {
+          if (FocusView.prepare({ minutes: r.focus.dur, level: r.focus.level || 'normal', intention: r.focus.title })) { FocusView.start(); PlanenHub.activeTab = 'focus'; App.navigate('planen', { animate: true }); }
+          else this.toast('Es läuft bereits ein Fokus.');
+        } });
+      } else this.toast(r.msg);
       try {
         if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: r.msg, icon: 'icons/icon-192.png' });
       } catch (e) {}

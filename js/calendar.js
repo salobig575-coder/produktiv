@@ -503,6 +503,7 @@ const CalendarView = {
 
   // ---------- Inbox ----------
   renderInbox(data) {
+    const risk = Planner.atRisk(data);
     const tasks = Planner.inbox(data.tasks).sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (b.createdAt || 0) - (a.createdAt || 0));
     const card = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.tasks(), style: 'width:14px;height:14px' }), 'Inbox']),
@@ -521,7 +522,7 @@ const CalendarView = {
           App.el('div', { class: 'item-title' }, t.title),
           App.el('div', { class: 'tag' }, [Planner.fmtDur(t.duration || 30), t.dueDate ? ` · fällig ${App.formatDate(t.dueDate).slice(0, 6)}` : ''].join('')),
         ]),
-        overdue ? App.el('span', { class: 'pill overdue' }, 'überfällig') : null,
+        overdue ? App.el('span', { class: 'pill overdue' }, 'überfällig') : (risk.has(t.id) ? App.el('span', { class: 'pill warn', title: 'Bei deiner aktuellen Auslastung wird es knapp' }, 'Knapp') : null),
         App.el('button', {
           class: 'icon-btn', style: 'color:var(--accent)', html: Icons.planen(), title: 'Einplanen',
           onclick: async () => {

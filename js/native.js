@@ -22,7 +22,14 @@ const Native = {
   },
 
   // Plant alle Erinnerungen der nächsten 7 Tage neu (alte werden vorher entfernt).
-  async syncReminders() {
+  // Entprellt: mehrere schnelle Änderungen führen zu einem einzigen Neuplanen
+  syncReminders() {
+    if (!this.plugin('LocalNotifications')) return;
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.syncNow(), 1500);
+  },
+
+  async syncNow() {
     const LN = this.plugin('LocalNotifications');
     if (!LN || this._syncing) return;
     this._syncing = true;

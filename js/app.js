@@ -26,6 +26,24 @@ const App = {
     this.bindShortcuts();
     this.bindGestures();
 
+    // Browser-Zurück und direkte Hash-Links (#planen)
+    window.addEventListener('hashchange', () => {
+      const h = location.hash.replace('#', '');
+      if (this.routes[h] && h !== this.current) this.navigate(h);
+    });
+    // Läuft die App über Mitternacht, springt „heute“ mit
+    this._day = this.todayStr();
+    const dayCheck = () => {
+      if (this.todayStr() === this._day) return;
+      const old = this._day;
+      this._day = this.todayStr();
+      if (typeof CalendarView !== 'undefined') { if (CalendarView.selectedDate === old) CalendarView.selectedDate = this._day; CalendarView._lastDate = null; }
+      this.refresh();
+    };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') dayCheck(); });
+    setInterval(dayCheck, 60000);
+    if (typeof FocusView !== 'undefined') FocusView.restore();
+
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
 
@@ -205,6 +223,7 @@ const App = {
       view.classList.remove('leaving');
       view.classList.toggle('no-anim', silent);
       view.replaceChildren(...(node ? [node] : []));
+      this.linkLabels(view);
       if (silent) {
         window.scrollTo(0, y);
       } else {
@@ -321,8 +340,26 @@ const App = {
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
     this._modal = backdrop;
+    // Barrierefreiheit: als Dialog auszeichnen, Fokus hineinsetzen, Beschriftungen mit Feldern verknüpfen
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    const heading = modal.querySelector('h3');
+    if (heading) { heading.id = heading.id || 'dlgTitle' + (++this._fid); modal.setAttribute('aria-labelledby', heading.id); }
+    this._prevFocus = document.activeElement;
+    modal.tabIndex = -1;
+    try { modal.focus({ preventScroll: true }); } catch (e) {}
+    this.linkLabels(modal);
     this.enableSheetDrag(backdrop, modal);
     return backdrop;
+  },
+
+  _fid: 0,
+  // Verknüpft <label> und Eingabefeld innerhalb von .field (Screenreader lesen so den Feldnamen vor)
+  linkLabels(root) {
+    root.querySelectorAll('.field').forEach((f) => {
+      const l = f.querySelector('label'), c = f.querySelector('input, select, textarea');
+      if (l && c && !l.htmlFor) { if (!c.id) c.id = 'fld' + (++this._fid); l.htmlFor = c.id; }
+    });
   },
 
   // Wie bei iOS-Sheets: Nach unten ziehen schließt das Fenster – am Balken (auch mit der Maus) oder überall im Inhalt,
@@ -400,6 +437,7 @@ const App = {
       this._modal = null;
       m.classList.add('closing');
       setTimeout(() => m.remove(), 300);
+      try { if (this._prevFocus && document.body.contains(this._prevFocus)) this._prevFocus.focus({ preventScroll: true }); } catch (e) {}
     }
   },
 

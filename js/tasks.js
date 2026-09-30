@@ -6,6 +6,7 @@ const TasksView = {
     const tasks = await DB.getAll('tasks');
     tasks.sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || b.createdAt - a.createdAt);
     const today = App.todayStr();
+    this._risk = Planner.atRisk(await Planner.load());
 
     const seg = (key, label) => App.el('button', { class: this.filter === key ? 'active' : '', onclick: () => { this.filter = key; App.refresh(); } }, label);
     wrap.appendChild(App.el('div', { class: 'cal-head' }, [
@@ -72,6 +73,7 @@ const TasksView = {
       t.subtasks && t.subtasks.length ? App.el('span', { class: 'pill' }, `${t.subtasks.filter((x) => x.done).length}/${t.subtasks.length}`) : null,
       t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
       t.priority === 'high' ? App.el('span', { class: 'pill overdue' }, 'Hoch') : null,
+      !t.done && this._risk && this._risk.has(t.id) ? App.el('span', { class: 'pill warn', title: 'Bei deiner aktuellen Auslastung wird es knapp' }, 'Knapp') : null,
     ].filter(Boolean);
     const line = App.el('div', { class: 'line' + (t.done ? ' done' : ''), style: `animation:popIn .35s var(--ease) both;animation-delay:${Math.min(i, 8) * 25}ms` }, [
       App.el('button', { class: 'checkbox' + (t.done ? ' checked' : ''), html: Icons.check(), onclick: (e) => this.toggleDone(t, e.currentTarget) }),

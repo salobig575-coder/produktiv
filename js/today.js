@@ -73,7 +73,7 @@ const TodayView = {
       for (const h of looseHabits) {
         const done = data.logs.some((l) => l.habitId === h.id && l.date === today);
         chips.appendChild(App.el('button', { class: 'chip' + (done ? ' on' : ''), onclick: async () => { await HabitsView.toggleLog(h.id, today); } }, [
-          App.el('span', { class: 'chip-dot' }), h.name,
+          App.el('span', { class: 'chip-dot' }), App.el('span', { class: 'chip-text' }, h.name),
         ]));
       }
       todayCard.appendChild(App.el('div', { class: 'tag', style: 'margin:' + (list.childNodes.length ? '14px' : '0') + ' 0 8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em' }, 'Gewohnheiten'));
