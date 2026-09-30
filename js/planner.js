@@ -6,10 +6,10 @@ const Planner = {
   REPEAT_LABEL: { none: 'Einmalig', daily: 'Täglich', weekdays: 'Werktags', weekly: 'Wöchentlich', monthly: 'Monatlich' },
 
   async settings() {
-    const keys = ['plannerStart', 'plannerEnd', 'plannerBuffer', 'remindersEnabled'];
+    const keys = ['plannerStart', 'plannerEnd', 'plannerBuffer', 'remindersEnabled', 'holidayState'];
     const rows = await Promise.all(keys.map((k) => DB.get('settings', k)));
     const v = (r, d) => (r && r.value != null ? r.value : d);
-    return { start: v(rows[0], 8 * 60), end: v(rows[1], 20 * 60), buffer: v(rows[2], 0), reminders: v(rows[3], false) };
+    return { start: v(rows[0], 8 * 60), end: v(rows[1], 20 * 60), buffer: v(rows[2], 0), reminders: v(rows[3], false), holidays: v(rows[4], '') };
   },
 
   fmt(min) {
@@ -76,7 +76,7 @@ const Planner = {
   async spawnNext(task) {
     if (!task.repeat || task.repeat === 'none' || task.spawned) return;
     const next = this.nextDue(task.dueDate || App.todayStr(), task.repeat);
-    if (!next) return;
+    if (!next || (task.repeatUntil && next > task.repeatUntil)) return;
     task.spawned = true;
     await DB.put('tasks', task);
     await DB.put('tasks', { ...task, id: DB.uid(), done: false, spawned: false, dueDate: next, planDate: null, planStart: null, createdAt: Date.now(), updatedAt: Date.now() });
@@ -182,6 +182,8 @@ const Planner = {
       return Math.abs(factor - 1) > 0.15 ? Math.ceil((d * factor) / 5) * 5 : d;
     };
     if (Math.abs(factor - 1) > 0.15) notes.push(`Deine Schätzungen liegen im Schnitt ${factor > 1 ? Math.round((factor - 1) * 100) + ' % zu kurz' : Math.round((1 - factor) * 100) + ' % zu lang'} – Dauer angepasst.`);
+    const hol = Holidays.name(date, s.holidays);
+    if (hol) notes.push(`${hol} – Feiertag. Der Vorschlag plant trotzdem ein.`);
     let fill = 0.85;
     if (date === App.todayStr() && data.sleep != null && data.sleep < 6) { fill = 0.6; notes.push(`Nur ${data.sleep} h Schlaf – heute wird etwas weniger eingeplant.`); }
 

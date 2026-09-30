@@ -1186,3 +1186,5 @@ a { color: var(--accent); }
 .yc.l4 { background: var(--danger); }
 .yc.today { outline: 2px solid var(--text); outline-offset: 1px; }
 .yc.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.yc.hol { box-shadow: inset 0 0 0 1.5px var(--warn); }

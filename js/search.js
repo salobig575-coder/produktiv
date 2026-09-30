@@ -7,7 +7,7 @@ const SearchView = {
     const content = App.el('div', {}, [
       App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:12px' }, [
         App.el('h3', { style: 'margin:0' }, 'Suche'),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => App.closeModal() }),
       ]),
       App.el('div', { class: 'field' }, [input]),
       box,

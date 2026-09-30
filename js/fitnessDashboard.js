@@ -136,7 +136,7 @@ const FitnessDashboardView = {
           onclick: async (e) => { e.currentTarget.classList.add('pop'); g.done = !g.done; await DB.put('goals', g); setTimeout(() => App.refresh(), 200); },
         }),
         App.el('div', { class: 'item-title' }, g.text),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: async () => { await DB.delete('goals', g.id); App.refresh(); } }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: async () => { await DB.delete('goals', g.id); App.refresh(); } }),
       ]));
     }
     if (goals.length === 0) list.appendChild(App.el('div', { class: 'empty', style: 'padding:10px' }, 'Noch keine Ziele.'));
@@ -245,7 +245,7 @@ const FitnessDashboardView = {
           App.el('h3', { style: 'margin:0' }, 'Datum wählen'),
           App.el('div', { class: 'tag', style: 'margin-top:2px' }, selD.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => App.closeModal() }),
       ]));
       container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
         App.el('button', { class: 'icon-btn', html: Icons.chevronUp(), style: 'transform:rotate(-90deg)', onclick: () => { view.setMonth(view.getMonth() - 1); renderCal(); } }),

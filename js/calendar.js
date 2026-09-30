@@ -14,7 +14,7 @@ const CalendarView = {
     const data = await Planner.load();
     const s = data.s;
 
-    wrap.appendChild(this.renderHeader());
+    wrap.appendChild(this.renderHeader(Holidays.name(this.selectedDate, s.holidays)));
     wrap.appendChild(this.renderQuickAdd());
 
     if (this.mode === 'week') {
@@ -24,6 +24,7 @@ const CalendarView = {
 
     wrap.appendChild(this.renderDateStrip(data));
     const items = Planner.dayItems(this.selectedDate, data);
+    this.renderWelcome(wrap, data);
     this.renderMissed(wrap, data);
     this.renderRituals(wrap, items, data);
     wrap.appendChild(this.renderSummary(items, s, data));
@@ -40,7 +41,7 @@ const CalendarView = {
   },
 
   // ---------- Kopf, Schnelleingabe ----------
-  renderHeader() {
+  renderHeader(holiday) {
     const d = new Date(this.selectedDate + 'T00:00:00');
     const isToday = this.selectedDate === this.today();
     const seg = (key, label) => App.el('button', { class: this.mode === key ? 'active' : '', onclick: () => { this.mode = key; this._scrolled = false; App.refresh(); } }, label);
@@ -50,7 +51,7 @@ const CalendarView = {
           App.el('div', { class: 'today-greet' }, isToday ? 'Heute' : d.toLocaleDateString('de-DE', { weekday: 'long' })),
           !isToday ? App.el('button', { class: 'pill active', style: 'border:none;cursor:pointer', onclick: () => { this.selectedDate = this.today(); App.refresh(); } }, 'Heute') : null,
         ]),
-        App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })),
+        App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) + (holiday ? ` · ${holiday}` : '')),
       ]),
       App.el('div', { class: 'row', style: 'gap:6px' }, [
         App.el('div', { class: 'seg' }, [seg('day', 'Tag'), seg('week', 'Woche')]),
@@ -130,7 +131,7 @@ const CalendarView = {
     const head = (title, onPrev, onNext, onTitle) => {
       container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:16px' }, [
         App.el('h3', { style: 'margin:0' }, yearMode ? 'Jahresübersicht' : 'Datum wählen'),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => App.closeModal() }),
       ]));
       container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
         App.el('button', { class: 'icon-btn', style: 'transform:scaleX(-1)', html: Icons.arrowRight(), onclick: onPrev }),
@@ -158,7 +159,7 @@ const CalendarView = {
             const ds = App.todayStr(new Date(year, m, d));
             const load = Planner.loadMinutes(Planner.dayItems(ds, data));
             const lvl = load === 0 ? 0 : load > capacity ? 4 : Math.min(3, Math.ceil((load / capacity) * 3));
-            cells.appendChild(App.el('span', { class: `yc l${lvl}` + (ds === this.today() ? ' today' : '') + (ds === this.selectedDate ? ' sel' : '') }));
+            cells.appendChild(App.el('span', { class: `yc l${lvl}` + (ds === this.today() ? ' today' : '') + (ds === this.selectedDate ? ' sel' : '') + (Holidays.name(ds, data.s.holidays) ? ' hol' : ''), title: Holidays.name(ds, data.s.holidays) || '' }));
           }
           grid.appendChild(App.el('div', { class: 'year-month' + (m === month ? ' current' : ''), onclick: () => { view.setMonth(m); yearMode = false; draw(); } }, [
             App.el('div', { class: 'year-name' }, first.toLocaleDateString('de-DE', { month: 'short' })),
@@ -190,6 +191,25 @@ const CalendarView = {
   },
 
   // ---------- Hinweise ----------
+  // Kurzer Einstieg, solange kaum Daten da sind – einmal wegklickbar.
+  renderWelcome(wrap, data) {
+    let hidden = false;
+    try { hidden = localStorage.getItem('hintCalendar') === '1'; } catch (e) {}
+    if (hidden || data.events.length + data.tasks.length >= 3) return;
+    const card = App.el('div', { class: 'card', style: 'padding:14px' }, [
+      App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+        App.el('div', { style: 'font-weight:800;margin-bottom:6px' }, 'So planst du in 3 Schritten'),
+        App.el('button', { class: 'icon-btn', html: Icons.close(), 'aria-label': 'Schließen', onclick: () => { try { localStorage.setItem('hintCalendar', '1'); } catch (e) {} card.remove(); } }),
+      ]),
+      App.el('div', { class: 'tag', style: 'line-height:1.6' }, [
+        '1. Oben tippen: „Zahnarzt Do 15 Uhr 1h“ oder „Steuer morgen 45min“.', App.el('br'),
+        '2. Aufgaben ohne Zeit landen in der Inbox – „Tag planen“ verteilt sie auf freie Zeit.', App.el('br'),
+        '3. Blöcke lang drücken und ziehen, um sie zu verschieben.',
+      ]),
+    ]);
+    wrap.appendChild(card);
+  },
+
   renderMissed(wrap, data) {
     const missed = Planner.missed(data.tasks);
     if (missed.length === 0) return;
@@ -454,7 +474,7 @@ const CalendarView = {
           App.el('div', { style: 'font-weight:800;margin-bottom:2px' }, title),
           ...lines.filter(Boolean).map((l) => App.el('div', { class: 'tag' }, l)),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => { Planner.dismissRitual(key); card.remove(); } }),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => { Planner.dismissRitual(key); card.remove(); } }),
       ]),
     ]);
     if (action) card.appendChild(App.el('button', { class: 'btn', style: 'margin:10px 0 0', onclick: action.fn }, action.label));
@@ -564,6 +584,7 @@ const CalendarView = {
           App.el('div', { class: 'row', style: 'gap:8px' }, [
             App.el('div', { style: 'font-weight:800' + (empty ? ';color:var(--text-dim)' : '') }, d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })),
             isToday ? App.el('span', { class: 'pill active' }, 'Heute') : null,
+            Holidays.name(ds, s.holidays) ? App.el('span', { class: 'pill', style: 'background:rgba(var(--warn-rgb),.18);color:var(--warn)' }, Holidays.name(ds, s.holidays)) : null,
           ]),
           load > capacity ? App.el('span', { class: 'pill overdue' }, 'Überlastet') : App.el('span', { class: 'tag' }, empty ? 'frei' : Planner.fmtDur(load)),
         ]),

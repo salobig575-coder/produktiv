@@ -54,7 +54,7 @@ const HabitsView = {
           App.el('div', { class: 'item-title' }, h.name),
           App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} ${streak === 1 ? "Tag" : "Tage"} in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
       ]));
     }
     wrap.appendChild(list);

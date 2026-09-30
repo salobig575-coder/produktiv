@@ -124,7 +124,7 @@ const TasksView = {
       t.subtasks.forEach((st) => subsBox.appendChild(App.el('div', { class: 'item' + (st.done ? ' done' : ''), style: 'padding:8px 12px;animation:none' }, [
         App.el('button', { class: 'checkbox' + (st.done ? ' checked' : ''), html: Icons.check(), onclick: () => { st.done = !st.done; drawSubs(); } }),
         App.el('div', { class: 'item-title', style: 'flex:1;min-width:0' }, st.title),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { t.subtasks = t.subtasks.filter((x) => x.id !== st.id); drawSubs(); } }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: () => { t.subtasks = t.subtasks.filter((x) => x.id !== st.id); drawSubs(); } }),
       ])));
     };
     const subInput = App.el('input', { type: 'text', placeholder: 'Unteraufgabe hinzufügen …', enterkeyhint: 'done' });
@@ -150,6 +150,9 @@ const TasksView = {
     durSelect.value = t.duration ? String(t.duration) : '';
     const repeatSelect = App.el('select', {}, Object.entries(Planner.REPEAT_LABEL).map(([k, l]) => App.el('option', { value: k }, l)));
     repeatSelect.value = t.repeat || 'none';
+    const untilInput = App.el('input', { type: 'date', value: t.repeatUntil || '' });
+    const untilField = App.el('div', { class: 'field', style: (t.repeat || 'none') === 'none' ? 'display:none' : '' }, [App.el('label', {}, 'Wiederholen bis (optional)'), untilInput]);
+    repeatSelect.addEventListener('change', () => { untilField.style.display = repeatSelect.value === 'none' ? 'none' : ''; });
     const notesInput = App.el('textarea', { placeholder: 'Notizen (optional)' }, t.notes || '');
 
     const content = App.el('div', {}, [
@@ -161,6 +164,7 @@ const TasksView = {
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Dauer'), durSelect]),
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Wiederholung'), repeatSelect]),
       ]),
+      untilField,
       t.planStart != null ? App.el('button', { class: 'btn secondary', style: 'margin-bottom:12px', onclick: async () => {
         t.planDate = null; t.planStart = null; t.updatedAt = Date.now();
         await DB.put('tasks', t); App.closeModal(); App.refresh();
@@ -191,6 +195,7 @@ const TasksView = {
             t.priority = prioSelect.value;
             t.duration = durSelect.value ? Number(durSelect.value) : null;
             t.repeat = repeatSelect.value;
+            t.repeatUntil = t.repeat === 'none' ? '' : untilInput.value;
             addSub();
             t.notes = notesInput.value;
             t.updatedAt = Date.now();

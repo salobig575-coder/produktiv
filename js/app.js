@@ -33,11 +33,27 @@ const App = {
       });
     }
 
+    setTimeout(() => this.backupReminder(), 6000);
+
     const splash = document.getElementById('splash');
     setTimeout(() => {
       splash.classList.add('hide');
       setTimeout(() => splash.remove(), 550);
     }, 1200);
+  },
+
+  // Ohne Sync gibt es nur eine lokale Kopie: alle 14 Tage an eine Sicherung erinnern (erster Start setzt nur die Uhr).
+  async backupReminder() {
+    try {
+      const sess = await DB.get('settings', 'syncSession');
+      if (sess && sess.value) return;
+      const last = Number(localStorage.getItem('lastBackup') || 0);
+      if (!last) { localStorage.setItem('lastBackup', String(Date.now())); return; }
+      if (Date.now() - last < 14 * 86400000) return;
+      const has = (await DB.getAll('tasks')).length + (await DB.getAll('events')).length + (await DB.getAll('workoutSessions')).length;
+      if (has === 0) return;
+      Planner.toast('Backup fällig – deine Daten liegen nur auf diesem Gerät.', { label: 'Sichern', fn: () => SettingsView.exportFile() });
+    } catch (e) {}
   },
 
   // Tastenkürzel für Mac und PC (greifen nicht beim Tippen in Feldern)
@@ -113,6 +129,7 @@ const App = {
     for (const [k, v] of Object.entries(attrs)) {
       if (k === 'class') node.className = v;
       else if (k === 'html') node.innerHTML = v;
+      else if (k === 'title' && tag === 'button') { node.setAttribute('title', v); node.setAttribute('aria-label', v); }
       else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
       else if (typeof v === 'boolean') { if (v) node.setAttribute(k, ''); else node.removeAttribute(k); }
       else node.setAttribute(k, v);
