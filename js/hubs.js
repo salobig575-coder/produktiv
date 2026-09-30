@@ -13,7 +13,7 @@ const PlanenHub = {
 
   async render() {
     const wrap = App.el('div');
-    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('planen'); }));
+    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('planen', { animate: true }); }));
     const node = await this.viewFor(this.activeTab).render();
     wrap.appendChild(node);
     return wrap;
@@ -31,7 +31,7 @@ const FitnessHub = {
 
   async render() {
     const wrap = App.el('div');
-    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('fitness'); }));
+    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('fitness', { animate: true }); }));
 
     let node;
     if (this.activeTab === 'uebersicht') {

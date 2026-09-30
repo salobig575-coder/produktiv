@@ -40,14 +40,19 @@ const NotesView = {
     }
     filtered.forEach((n, i) => {
       const preview = (n.content || '').slice(0, 80);
-      list.appendChild(App.el('div', { class: 'item', style: `align-items:flex-start;cursor:pointer;animation-delay:${i * 30}ms`, onclick: () => this.openEditor(n) }, [
+      const noteRow = App.el('div', { class: 'item', style: `align-items:flex-start;cursor:pointer;animation-delay:${i * 30}ms`, onclick: () => this.openEditor(n) }, [
         App.el('span', { html: Icons.notes(), style: 'width:20px;height:20px;color:var(--accent);flex-shrink:0;margin-top:2px' }),
         App.el('div', { style: 'flex:1' }, [
           App.el('div', { class: 'item-title' }, n.title || '(ohne Titel)'),
           App.el('div', { class: 'item-meta' }, preview),
         ]),
         App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: (e) => { e.stopPropagation(); this.remove(n, e); } }),
-      ]));
+      ]);
+      list.appendChild(Gestures.swipeable(noteRow, { left: [{ label: 'Löschen', color: '#e5484d', fn: async () => {
+        await DB.delete('notes', n.id);
+        App.refresh();
+        Planner.toast('Notiz gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('notes', n); App.refresh(); } });
+      } }] }));
     });
   },
 

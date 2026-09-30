@@ -73,7 +73,24 @@ function openDB() {
       }
     };
 
-    req.onsuccess = () => resolve(req.result);
+    // Blockiert eine noch laufende alte App-Instanz das Update, hängt sonst alles ohne Meldung
+    req.onblocked = () => {
+      const show = () => {
+        if (document.getElementById('dbBlocked')) return;
+        const b = document.createElement('div');
+        b.id = 'dbBlocked';
+        b.style.cssText = 'position:fixed;left:16px;right:16px;bottom:100px;z-index:999;background:#e5484d;color:#fff;padding:14px 16px;border-radius:14px;font:600 14px/1.4 -apple-system,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3)';
+        b.textContent = 'Die Datenbank wird aktualisiert, aber die App ist noch woanders geöffnet. Bitte alle Produktiv-Fenster schließen (auf dem iPhone: im App-Wechsler nach oben wischen) und neu öffnen.';
+        document.body.appendChild(b);
+      };
+      if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      // Künftige Updates dürfen nicht an offenen Verbindungen hängen bleiben
+      db.onversionchange = () => { db.close(); location.reload(); };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -104,11 +121,17 @@ const DB = {
   },
 
   async getAll(storeName) {
-    return withStore(storeName, 'readonly', (store) => reqToPromise(store.getAll())).then((p) => p);
+    try {
+      return await withStore(storeName, 'readonly', (store) => reqToPromise(store.getAll()));
+    } catch (e) {
+      if (e && e.name === 'NotFoundError') return []; // Speicher fehlt (Update noch nicht durch) – leer statt Absturz
+      throw e;
+    }
   },
 
   async get(storeName, id) {
     const db = await dbPromise;
+    if (!db.objectStoreNames.contains(storeName)) return undefined;
     return new Promise((resolve, reject) => {
       const tx = db.transaction(storeName, 'readonly');
       const req = tx.objectStore(storeName).get(id);

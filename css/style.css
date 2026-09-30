@@ -26,6 +26,7 @@
   --shadow-lg: 0 12px 32px -8px rgba(20,22,29,.18);
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-ios: cubic-bezier(.32, .72, 0, 1); /* iOS-Sheet-Kurve: schnell an, sanft aus, ohne Überschwingen */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,15 +69,22 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* Gitter-Hintergrund als eigene fixierte Ebene (ruckelt beim Scrollen nicht wie background-attachment: fixed) */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(rgba(var(--accent-rgb), .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--accent-rgb), .05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  transform: translateZ(0);
+}
+button, a, .item, .line, .date-cell, .chip { touch-action: manipulation; }
+html { -webkit-text-size-adjust: 100%; }
+
 html, body {
   margin: 0;
   height: 100%;
-  background:
-    linear-gradient(rgba(var(--accent-rgb), .05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--accent-rgb), .05) 1px, transparent 1px),
-    var(--bg);
-  background-size: 28px 28px, 28px 28px, auto;
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -.01em;
@@ -210,24 +218,24 @@ main {
   padding: 4px 20px 24px;
 }
 
-#view { animation: viewIn .32s var(--ease) both; }
-#view.leaving { animation: viewOut .18s var(--ease) both; }
+#view { animation: viewIn .34s var(--ease-ios) both; }
+#view.leaving { animation: viewOut .11s linear both; }
 
 @keyframes viewIn {
-  0% { opacity: 0; transform: translateY(10px) scale(.99); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes viewOut {
-  0% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-6px); }
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 @keyframes fadeSlideIn {
   0% { opacity: 0; transform: translateX(-6px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 @keyframes popIn {
-  0% { opacity: 0; transform: translateY(8px) scale(.96); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* ---------- Cards ---------- */
@@ -634,14 +642,13 @@ nav.bottomnav button:active { transform: scale(.9); }
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
   z-index: 20;
-  animation: backdropIn .25s var(--ease) both;
+  animation: backdropIn .3s var(--ease-ios) both;
 }
-.modal-backdrop.closing { animation: backdropOut .2s var(--ease) both; }
+.modal-backdrop.closing { animation: backdropOut .26s var(--ease-ios) both; }
 @keyframes backdropIn { 0% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes backdropOut { 0% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -654,21 +661,25 @@ nav.bottomnav button:active { transform: scale(.9); }
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
-  animation: modalUp .38s var(--ease-spring) both;
+  animation: modalUp .42s var(--ease-ios) both;
 }
-.modal-backdrop.closing .modal { animation: modalDown .2s var(--ease) both; }
+.modal-backdrop.closing .modal { animation: modalDown .28s var(--ease-ios) both; }
 @keyframes modalUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
-@keyframes modalDown { 0% { transform: translateY(0); } 100% { transform: translateY(40%); opacity: 0; } }
+@keyframes modalDown { 0% { transform: translateY(0); } 100% { transform: translateY(100%); } }
 
 .modal::before {
   content: "";
   display: block;
   width: 40px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 4px;
+  height: 5px;
+  background: var(--text-dim);
+  opacity: .35;
+  border-radius: 5px;
   margin: -8px auto 16px;
+  box-shadow: 0 0 0 14px transparent; /* größere Greiffläche */
 }
+.modal.sheet-grab, .modal.sheet-grab * { cursor: grab; }
+.modal.sheet-dragging, .modal.sheet-dragging * { cursor: grabbing; user-select: none; }
 .modal h3 { margin: 0 0 16px; font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
 
 .stat-row { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -1188,3 +1199,117 @@ a { color: var(--accent); }
 .yc.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .yc.hol { box-shadow: inset 0 0 0 1.5px var(--warn); }
+
+/* ================= Animationen (Feinschliff) ================= */
+/* Karten erscheinen nacheinander */
+#view > div > .card:nth-child(2), #view > div > .today-head + .card { animation-delay: .04s; }
+#view > div > .card:nth-child(3) { animation-delay: .08s; }
+#view > div > .card:nth-child(4) { animation-delay: .12s; }
+#view > div > .card:nth-child(5) { animation-delay: .16s; }
+#view > div > .card:nth-child(6) { animation-delay: .2s; }
+.today-head { animation: fadeSlideIn .4s var(--ease) both; }
+
+/* Tag wechseln: Timeline und Datumsleiste gleiten in Richtung der Navigation */
+@keyframes slideFromRight { 0% { opacity: 0; transform: translateX(28px); } 100% { opacity: 1; transform: translateX(0); } }
+@keyframes slideFromLeft { 0% { opacity: 0; transform: translateX(-28px); } 100% { opacity: 1; transform: translateX(0); } }
+.slide-r { animation: slideFromRight .35s var(--ease) both !important; }
+.slide-l { animation: slideFromLeft .35s var(--ease) both !important; }
+
+/* Umschalter: aktives Segment federt ein */
+@keyframes segPop { 0% { transform: scale(.88); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+.seg button.active { animation: segPop .32s var(--ease-spring); }
+
+/* Balken wachsen von links */
+@keyframes barGrow { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+.load-fill { transform-origin: left; animation: barGrow .8s var(--ease) both; }
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.load-bar { position: relative; overflow: hidden; }
+.load-fill.live { position: relative; overflow: hidden; }
+.load-fill.live::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Jetzt-Linie pulsiert */
+@keyframes nowPulse { 0% { box-shadow: 0 0 0 0 rgba(var(--danger-rgb), .55); } 70% { box-shadow: 0 0 0 7px rgba(var(--danger-rgb), 0); } 100% { box-shadow: 0 0 0 0 rgba(var(--danger-rgb), 0); } }
+.tl-now::before { animation: nowPulse 2s ease-out infinite; }
+
+/* Zeilen verlassen die Liste weich */
+@keyframes lineOut { 0% { opacity: 1; transform: translateX(0); max-height: 90px; } 60% { opacity: 0; transform: translateX(26px); max-height: 90px; } 100% { opacity: 0; transform: translateX(26px); max-height: 0; padding-top: 0; padding-bottom: 0; } }
+.line.leaving { animation: lineOut .32s var(--ease) forwards !important; overflow: hidden; }
+
+/* Toast: feder von unten, bleibt dabei mittig (vorher sprang er kurz) */
+@keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, 18px) scale(.95); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+.toast { animation: toastIn .4s var(--ease-ios) both; }
+
+/* Konfetti bei Erfolgen */
+@keyframes confettiFly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.6); }
+}
+.confetti {
+  position: fixed; z-index: 400; width: 8px; height: 12px; border-radius: 2px; pointer-events: none;
+  animation: confettiFly .95s cubic-bezier(.16, .84, .44, 1) forwards;
+}
+
+/* Kleine Rückmeldungen */
+@keyframes chipPop { 0% { transform: scale(.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.chip.on { animation: chipPop .3s var(--ease-spring); }
+.year-month { animation: popIn .4s var(--ease) both; }
+.year-month:nth-child(3n+2) { animation-delay: .04s; }
+.year-month:nth-child(3n) { animation-delay: .08s; }
+
+/* Wer Bewegung reduziert haben möchte, bekommt keine */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .confetti { display: none; }
+}
+
+/* ================= iPhone-Gefühl ================= */
+/* Kein Zoom beim Antippen von Feldern (iOS zoomt bei < 16px) */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* Bei leisem Aktualisieren (Häkchen, Sync, Speichern) nichts neu einblenden – kein Flackern */
+#view.no-anim, #view.no-anim .card, #view.no-anim .item, #view.no-anim .line, #view.no-anim .tl-block,
+#view.no-anim .year-month, #view.no-anim .today-head, #view.no-anim .stat, #view.no-anim .mini,
+#view.no-anim .date-cell, #view.no-anim .week-day, #view.no-anim .load-fill:not(.live) { animation: none !important; }
+
+/* Weichere Rückmeldung beim Drücken: schnell runter, federnd zurück */
+.btn, .item, .date-cell, .chip, .fab-mini, .icon-btn, .seg button, .tab-pill, .cal-day, .year-month {
+  transition-property: transform, background-color, border-color, color, opacity, box-shadow;
+  transition-duration: .28s;
+  transition-timing-function: var(--ease-ios);
+}
+.btn:active, .item:active, .date-cell:active, .chip:active, .fab-mini:active, .tab-pill:active, .cal-day:active, .year-month:active {
+  transition-duration: .08s; transform: scale(.97);
+}
+
+/* Weiches Scrollen in Listen und Sheets */
+.modal, .tl-scroll, .tab-bar, .date-strip { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+/* ================= iPhone-Gesten ================= */
+.swipe-wrap { position: relative; overflow: hidden; }
+.swipe-row { position: relative; background: var(--surface); touch-action: pan-y; will-change: transform; }
+.swipe-bg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; color: #fff; font-weight: 800; font-size: 14px; }
+.swipe-bg.lead { left: 0; right: 0; padding-left: 20px; }
+.swipe-bg.trail { right: 0; }
+.swipe-btn { border: none; height: 100%; color: #fff; font-weight: 800; font-size: 14px; cursor: pointer; }
+.line-list > .swipe-wrap { border-bottom: 1px solid var(--border); }
+.line-list > .swipe-wrap:last-child { border-bottom: none; }
+.swipe-wrap .line { border-bottom: none; }
+.list > .swipe-wrap { border-radius: var(--radius-sm); }
+.lp-target { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
+/* Ziehen zum Aktualisieren */
+#ptr {
+  position: fixed; top: calc(70px + env(safe-area-inset-top)); left: 50%; z-index: 40; width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); color: var(--accent);
+  transform: translate(-50%, -60px); opacity: 0;
+}
+#ptr svg { width: 20px; height: 20px; }
+@keyframes ptrSpin { to { transform: translate(-50%, 34px) rotate(360deg); } }
+#ptr.spin { animation: ptrSpin .9s linear infinite; }

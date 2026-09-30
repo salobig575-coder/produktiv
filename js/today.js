@@ -1,14 +1,16 @@
 const TodayView = {
   // Leichte Listenzeile statt eigener Box – hält den Tab ruhig.
-  line({ check, checked, onCheck, title, meta, right, onClick }) {
-    return App.el('div', { class: 'line' }, [
-      check ? App.el('button', { class: 'checkbox' + (checked ? ' checked' : ''), html: Icons.check(), onclick: (e) => { e.currentTarget.classList.add('checked', 'pop'); onCheck(); } }) : App.el('span', { class: 'line-dot' }),
+  line({ check, checked, onCheck, title, meta, right, onClick, swipe, menu }) {
+    const row = App.el('div', { class: 'line' }, [
+      check ? App.el('button', { class: 'checkbox' + (checked ? ' checked' : ''), html: Icons.check(), onclick: (e) => { e.currentTarget.classList.add('checked', 'pop'); App.confetti(e.currentTarget, 10); onCheck(); } }) : App.el('span', { class: 'line-dot' }),
       App.el('div', { class: 'line-main', style: onClick ? 'cursor:pointer' : '', onclick: onClick }, [
         App.el('div', { class: 'item-title' }, title),
         meta ? App.el('div', { class: 'tag' }, meta) : null,
       ]),
       right ? App.el('div', { class: 'line-right' }, right) : null,
     ]);
+    if (menu) Gestures.longPress(row, menu);
+    return swipe ? Gestures.swipeable(row, swipe) : row;
   },
 
   async render() {
@@ -51,14 +53,14 @@ const TodayView = {
     const list = App.el('div', { class: 'line-list' });
     for (const it of items.slice(0, 4)) {
       const time = App.el('span', { class: 'pill' }, Planner.fmt(it.start));
-      if (it.type === 'task') list.appendChild(this.line({ check: true, onCheck: async () => { it.ref.done = true; it.ref.updatedAt = Date.now(); await DB.put('tasks', it.ref); await Planner.spawnNext(it.ref); setTimeout(() => App.refresh(), 200); }, title: it.title, meta: Planner.fmtDur(it.dur), right: time, onClick: () => TasksView.openEditor(it.ref) }));
-      else if (it.type === 'habit') list.appendChild(this.line({ check: true, onCheck: async () => { await HabitsView.toggleLog(it.id, today); }, title: it.title, meta: Planner.fmtDur(it.dur), right: time }));
+      if (it.type === 'task') list.appendChild(this.line({ check: true, onCheck: async () => { it.ref.done = true; it.ref.updatedAt = Date.now(); await DB.put('tasks', it.ref); await Planner.spawnNext(it.ref); setTimeout(() => App.refresh(), 200); }, title: it.title, meta: Planner.fmtDur(it.dur), right: time, onClick: () => TasksView.openEditor(it.ref), swipe: TasksView.swipeCfg(it.ref), menu: () => Gestures.actionSheet(it.title, TasksView.actionsFor(it.ref)) }));
+      else if (it.type === 'habit') list.appendChild(this.line({ check: true, onCheck: async () => { await HabitsView.toggleLog(it.id, today); }, title: it.title, meta: Planner.fmtDur(it.dur), right: time, swipe: { right: { label: '✓ Abhaken', color: '#16a34a', fn: () => HabitsView.toggleLog(it.id, today) } } }));
       else list.appendChild(this.line({ title: it.title, meta: Planner.fmtDur(it.dur), right: time, onClick: () => { PlanenHub.activeTab = 'calendar'; CalendarView.selectedDate = today; App.navigate('planen'); } }));
     }
     for (const t of due.slice(0, 3)) {
       list.appendChild(this.line({
         check: true, onCheck: async () => { t.done = true; t.updatedAt = Date.now(); await DB.put('tasks', t); await Planner.spawnNext(t); setTimeout(() => App.refresh(), 200); },
-        title: t.title, right: App.el('span', { class: 'pill' + (t.dueDate < today ? ' overdue' : '') }, t.dueDate < today ? 'überfällig' : 'fällig'), onClick: () => TasksView.openEditor(t),
+        title: t.title, right: App.el('span', { class: 'pill' + (t.dueDate < today ? ' overdue' : '') }, t.dueDate < today ? 'überfällig' : 'fällig'), onClick: () => TasksView.openEditor(t), swipe: TasksView.swipeCfg(t), menu: () => Gestures.actionSheet(t.title, TasksView.actionsFor(t)),
       }));
     }
     if (list.childNodes.length === 0 && looseHabits.length === 0) {
@@ -90,7 +92,11 @@ const TodayView = {
     const latestWeight = weightEnabled ? await BodyMetrics.latest() : null;
     const sessions = await DB.getAll('focusSessions');
     const focusMin = Math.round(sessions.filter((x) => App.todayStr(new Date(x.startedAt)) === today).reduce((sum, x) => sum + x.duration, 0) / 60);
-    const mini = (n, l) => App.el('div', { class: 'mini' }, [App.el('div', { class: 'mini-num' }, String(n)), App.el('div', { class: 'mini-lbl' }, l)]);
+    const mini = (n, l) => {
+      const num = App.el('div', { class: 'mini-num' }, String(n));
+      if (typeof n === 'number' && n > 0) requestAnimationFrame(() => App.animateCounter(num, n, { from: 0, duration: 700 }));
+      return App.el('div', { class: 'mini' }, [num, App.el('div', { class: 'mini-lbl' }, l)]);
+    };
     wrap.appendChild(App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Fortschritt']),
       App.el('div', { class: 'mini-row' }, [
@@ -133,17 +139,17 @@ const TodayView = {
       PlanenHub.activeTab = 'focus';
       App.navigate('planen');
     };
-    const btn = (label, fn, secondary) => App.el('button', { class: 'btn' + (secondary ? ' secondary' : ''), style: 'flex:1;margin:0', onclick: fn }, label);
+    const btn = (label, fn, secondary) => App.el('button', { class: 'btn' + (secondary ? ' secondary' : ''), style: 'flex:1;margin:0', onclick: (e) => fn(e) }, label);
     const actions = (nodes) => card.appendChild(App.el('div', { class: 'row', style: 'margin-top:12px' }, nodes));
 
     if (current) {
       const pct = Math.round(((now - current.start) / (current.end - current.start)) * 100);
       card.appendChild(App.el('div', { style: 'font-size:19px;font-weight:800' }, current.title));
       card.appendChild(App.el('div', { class: 'tag', style: 'margin:2px 0 10px' }, `${Planner.fmt(current.start)}–${Planner.fmt(current.end)} · noch ${Planner.fmtDur(current.end - now)}`));
-      card.appendChild(App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill', style: `width:${pct}%` })]));
+      card.appendChild(App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill live', style: `width:${pct}%` })]));
       if (current.type === 'task') {
         actions([
-          btn('Erledigt', async () => { current.ref.done = true; current.ref.updatedAt = Date.now(); await DB.put('tasks', current.ref); await Planner.spawnNext(current.ref); App.refresh(); }, true),
+          btn('Erledigt', async (e) => { App.confetti(e.currentTarget, 22); current.ref.done = true; current.ref.updatedAt = Date.now(); await DB.put('tasks', current.ref); await Planner.spawnNext(current.ref); setTimeout(() => App.refresh(), 450); }, true),
           btn('Fokus starten', () => goFocus({ minutes: Math.min(current.end - now, 120), intention: current.title, taskId: current.id })),
         ]);
       } else if (current.type === 'habit') {

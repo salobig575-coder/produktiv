@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Produktiv – Aktualisieren</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f5f8; color: #12151c; }
+  @media (prefers-color-scheme: dark) { body { background: #0a0d16; color: #f1f2f6; } .card { background: #131722 !important; border-color: #242a3a !important; } }
+  .card { max-width: 360px; width: 100%; background: #fff; border: 1px solid #e2e5ec; border-radius: 18px; padding: 24px; text-align: center; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { font-size: 14px; line-height: 1.5; opacity: .75; margin: 0 0 16px; }
+  a.btn { display: block; padding: 14px; border-radius: 12px; color: #fff; text-decoration: none; font-weight: 800;
+    background: linear-gradient(135deg, #16a34a, #4ade80); }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="title">Aktualisiere …</h1>
+  <p id="msg">Der alte Zwischenspeicher wird geleert. Deine Daten (Aufgaben, Termine, Workouts) bleiben erhalten.</p>
+  <a class="btn" id="go" href="./index.html" style="display:none">Produktiv öffnen</a>
+</div>
+<script>
+  (async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      document.getElementById('title').textContent = 'Fertig ✓';
+      document.getElementById('msg').textContent = 'Die neueste Version wird jetzt geladen. Deine Daten sind unverändert.';
+      document.getElementById('go').style.display = 'block';
+      setTimeout(() => { location.replace('./index.html'); }, 1500);
+    } catch (e) {
+      document.getElementById('title').textContent = 'Das hat nicht geklappt';
+      document.getElementById('msg').textContent = 'Bitte in den Browser-Einstellungen die Website-Daten für diese Seite löschen (Aufgaben und Termine sind dann weg – vorher ein Backup exportieren).';
+      document.getElementById('go').style.display = 'block';
+    }
+  })();
+</script>
+</body>
+</html>

@@ -14,30 +14,49 @@ const CalendarView = {
     const data = await Planner.load();
     const s = data.s;
 
+    // Richtung des Tageswechsels (nur beim Wechsel innerhalb der Kalenderansicht)
+    const dir = this._lastDate && this._lastDate !== this.selectedDate ? (this.selectedDate > this._lastDate ? 'slide-r' : 'slide-l') : '';
+    this._lastDate = this.selectedDate;
     wrap.appendChild(this.renderHeader(Holidays.name(this.selectedDate, s.holidays)));
     wrap.appendChild(this.renderQuickAdd());
 
     if (this.mode === 'week') {
       wrap.appendChild(this.renderWeek(data, s));
+      this.attachDaySwipe(wrap);
       return wrap;
     }
 
-    wrap.appendChild(this.renderDateStrip(data));
+    const strip = this.renderDateStrip(data);
+    wrap.appendChild(strip);
     const items = Planner.dayItems(this.selectedDate, data);
     this.renderWelcome(wrap, data);
     this.renderMissed(wrap, data);
     this.renderRituals(wrap, items, data);
     wrap.appendChild(this.renderSummary(items, s, data));
-    wrap.appendChild(this.renderTimeline(items, s));
+    const tlCard = this.renderTimeline(items, s);
+    if (dir) { tlCard.classList.add(dir); strip.classList.add(dir); }
+    wrap.appendChild(tlCard);
     wrap.appendChild(this.renderInbox(data));
 
-    let x0 = 0, y0 = 0;
-    wrap.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-    wrap.addEventListener('touchend', (e) => {
-      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
-      if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2) { this.selectedDate = Planner.addDays(this.selectedDate, dx < 0 ? 1 : -1); App.refresh(); }
-    }, { passive: true });
+    this.attachDaySwipe(wrap);
     return wrap;
+  },
+
+  // Horizontal wischen wechselt Tag bzw. Woche (nicht auf Datumsleiste, Zeilen, Blöcken und Feldern)
+  attachDaySwipe(wrap) {
+    let x0 = 0, y0 = 0, skip = false;
+    wrap.addEventListener('touchstart', (e) => {
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+      skip = !!e.target.closest('.date-strip, .swipe-wrap, .tl-block, .week-item, input, select, textarea');
+    }, { passive: true });
+    wrap.addEventListener('touchend', (e) => {
+      if (skip || Date.now() - Gestures.lastSwipe < 500) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2) {
+        this.selectedDate = Planner.addDays(this.selectedDate, (dx < 0 ? 1 : -1) * (this.mode === 'week' ? 7 : 1));
+        App.refresh();
+      }
+    }, { passive: true });
   },
 
   // ---------- Kopf, Schnelleingabe ----------
@@ -393,6 +412,7 @@ const CalendarView = {
     const finish = async (commit) => {
       block.classList.remove('dragging');
       block._suppressClick = drag && moved;
+      if (drag && moved) Gestures.lastSwipe = Date.now();
       if (drag && moved && commit) {
         const clampStart = Math.max(0, Math.min(start, 1440 - dur));
         if (it.type === 'event') { it.ref.start = clampStart; it.ref.dur = dur; await DB.put('events', it.ref); }
@@ -495,7 +515,7 @@ const CalendarView = {
     const list = App.el('div', { class: 'line-list' });
     for (const t of tasks.slice(0, 8)) {
       const overdue = t.dueDate && t.dueDate < today;
-      list.appendChild(App.el('div', { class: 'line' }, [
+      const inboxRow = App.el('div', { class: 'line' }, [
         App.el('span', { class: 'line-dot' }),
         App.el('div', { class: 'line-main', style: 'cursor:pointer', onclick: () => TasksView.openEditor(t) }, [
           App.el('div', { class: 'item-title' }, t.title),
@@ -511,7 +531,12 @@ const CalendarView = {
             App.refresh();
           },
         }),
-      ]));
+      ]);
+      Gestures.longPress(inboxRow, () => Gestures.actionSheet(t.title, TasksView.actionsFor(t)));
+      list.appendChild(Gestures.swipeable(inboxRow, {
+        right: { label: '📅 Einplanen', color: '#16a34a', fn: async () => { if (!(await Planner.scheduleTask(t, this.selectedDate))) Planner.toast('Kein freier Platz an diesem Tag.'); App.refresh(); } },
+        left: TasksView.swipeCfg(t).left,
+      }));
     }
     card.appendChild(list);
     if (tasks.length > 8) card.appendChild(App.el('div', { class: 'tag', style: 'margin-top:8px' }, `+ ${tasks.length - 8} weitere im Tab „Aufgaben“`));

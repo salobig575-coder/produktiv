@@ -1,12 +1,14 @@
-const CACHE_NAME = 'produktiv-v35';
+const CACHE_NAME = 'produktiv-v41';
 const ASSETS = [
   './',
   './index.html',
+  './reset.html',
   './manifest.json',
   './css/style.css',
   './js/icons.js',
   './js/db.js',
   './js/calc.js',
+  './js/gestures.js',
   './js/sync.js',
   './js/app.js',
   './js/today.js',
@@ -39,7 +41,7 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())
   );
 });
 
@@ -55,17 +57,26 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   // Nur eigene Dateien und Schriften cachen – Sync- und KI-Anfragen gehen immer direkt ins Netz.
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin && !/^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) return;
+  const isFont = /^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
+  if (url.origin !== self.location.origin && !isFont) return;
+
+  if (isFont) {
+    // Schriften ändern sich nie: aus dem Cache, sonst holen
+    event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((res) => {
+      if (res && res.status === 200) { const copy = res.clone(); caches.open(CACHE_NAME).then((c) => c.put(event.request, copy)); }
+      return res;
+    })));
+    return;
+  }
+
+  // Eigene Dateien: erst Netz (ohne HTTP-Cache), dann Cache. So erscheinen neue Versionen sofort, offline läuft die App trotzdem.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request).then((res) => {
-        if (res && res.status === 200) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request, { cache: 'no-cache' }).then((res) => {
+      if (res && res.status === 200) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      }
+      return res;
+    }).catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
   );
 });
