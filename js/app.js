@@ -19,6 +19,10 @@ const App = {
     document.getElementById('searchBtn').innerHTML = Icons.search();
     document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
 
+    let lastErr = 0;
+    const surface = (m) => { if (Date.now() - lastErr > 4000) { lastErr = Date.now(); Planner.toast('Fehler: ' + String(m).slice(0, 90)); } };
+    window.addEventListener('error', (e) => surface(e.message));
+    window.addEventListener('unhandledrejection', (e) => surface((e.reason && e.reason.message) || e.reason));
     this.bindShortcuts();
     this.bindGestures();
 
@@ -131,8 +135,9 @@ const App = {
     document.addEventListener('keydown', (e) => {
       const tag = (e.target.tagName || '').toLowerCase();
       const typing = ['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable;
+      if (!e.key) return; // Autofill-Ereignisse auf iOS haben keine Taste
       if (e.key === 'Escape' && this._modal) { this.closeModal(); return; }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); SearchView.open(); return; }
+      if ((e.metaKey || e.ctrlKey) && (e.key || '').toLowerCase() === 'k') { e.preventDefault(); SearchView.open(); return; }
       if (typing || e.metaKey || e.ctrlKey || e.altKey || this._modal) return;
       const cal = this.current === 'planen' && PlanenHub.activeTab === 'calendar';
       const step = (n) => { CalendarView.selectedDate = Planner.addDays(CalendarView.selectedDate || this.todayStr(), n * (CalendarView.mode === 'week' ? 7 : 1)); this.refresh(); };
@@ -152,6 +157,25 @@ const App = {
       if (this.current === 'planen' && PlanenHub.activeTab === 'tasks') keys.n = () => TasksView.openEditor();
       if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
     });
+  },
+
+  // Statt eines leeren Bildschirms: Fehler sichtbar machen, mit Ausweg
+  showError(err) {
+    console.error(err);
+    const msg = (err && (err.message || err.name)) || String(err);
+    const view = document.getElementById('view');
+    if (!view) return;
+    view.classList.remove('leaving');
+    view.replaceChildren(this.el('div', { class: 'card' }, [
+      this.el('h2', {}, 'Hier ist etwas schiefgegangen'),
+      this.el('p', { class: 'tag', style: 'word-break:break-word;margin:0 0 14px' }, msg),
+      this.el('button', { class: 'btn', style: 'margin-bottom:8px', onclick: () => location.reload() }, 'Neu laden'),
+      this.el('button', { class: 'btn secondary', onclick: async () => {
+        if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+        if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+        location.reload();
+      } }, 'Zwischenspeicher leeren & neu laden'),
+    ]));
   },
 
   // Rendert eine Ansicht ohne Flackern: alter Inhalt bleibt stehen, bis der neue fertig ist (kein leerer Zwischenzustand).
@@ -176,7 +200,7 @@ const App = {
     const view = document.getElementById('view');
     const token = (this._renderToken = (this._renderToken || 0) + 1);
     const y = window.scrollY;
-    const apply = () => Promise.resolve(this.routes[route].render()).then((node) => {
+    const apply = () => Promise.resolve().then(() => this.routes[route].render()).then((node) => {
       if (token !== this._renderToken) return; // ein neuerer Aufruf hat übernommen
       view.classList.remove('leaving');
       view.classList.toggle('no-anim', silent);
@@ -189,7 +213,7 @@ const App = {
         void view.offsetWidth; // Animation neu starten
         view.style.animation = '';
       }
-    });
+    }).catch((err) => { if (token === this._renderToken) this.showError(err); });
 
     if (opts.instant || silent || !view.hasChildNodes()) {
       apply();
