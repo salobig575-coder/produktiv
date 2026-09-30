@@ -84,10 +84,14 @@ const App = {
     });
   },
 
+  // Rendert eine Ansicht ohne Flackern: alter Inhalt bleibt stehen, bis der neue fertig ist (kein leerer Zwischenzustand).
+  // Gleicher Bereich + gleicher Tab = "leises" Aktualisieren: keine Einblend-Animation, Scrollposition bleibt.
   navigate(route, opts = {}) {
     if (!this.routes[route]) route = 'today';
+    const wasCurrent = this.current === route;
+    const silent = !!opts.silent || (wasCurrent && !opts.animate);
     this.current = route;
-    location.hash = route;
+    if (location.hash !== '#' + route) location.hash = route;
 
     document.querySelectorAll('nav.bottomnav button').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.route === route);
@@ -97,27 +101,36 @@ const App = {
     if (indicator) indicator.style.transform = `translateX(${idx * 100}%)`;
 
     document.getElementById('pageTitle').textContent = this.routes[route].title;
-    document.getElementById('pageSub').textContent = '';
+    if (!silent) document.getElementById('pageSub').textContent = '';
 
     const view = document.getElementById('view');
-    const render = () => {
-      view.innerHTML = '';
+    const token = (this._renderToken = (this._renderToken || 0) + 1);
+    const y = window.scrollY;
+    const apply = () => Promise.resolve(this.routes[route].render()).then((node) => {
+      if (token !== this._renderToken) return; // ein neuerer Aufruf hat übernommen
       view.classList.remove('leaving');
-      Promise.resolve(this.routes[route].render()).then((node) => {
-        if (node) view.appendChild(node);
-      });
-    };
+      view.classList.toggle('no-anim', silent);
+      view.replaceChildren(...(node ? [node] : []));
+      if (silent) {
+        window.scrollTo(0, y);
+      } else {
+        window.scrollTo(0, 0);
+        view.style.animation = 'none';
+        void view.offsetWidth; // Animation neu starten
+        view.style.animation = '';
+      }
+    });
 
-    if (opts.instant || !view.hasChildNodes()) {
-      render();
+    if (opts.instant || silent || !view.hasChildNodes()) {
+      apply();
     } else {
       view.classList.add('leaving');
-      setTimeout(render, 150);
+      setTimeout(apply, 110);
     }
   },
 
   refresh() {
-    this.navigate(this.current, { instant: true });
+    this.navigate(this.current, { instant: true, silent: true });
   },
 
   setSub(text) {
@@ -214,7 +227,38 @@ const App = {
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
     this._modal = backdrop;
+    this.enableSheetDrag(backdrop, modal);
     return backdrop;
+  },
+
+  // Wie bei iOS-Sheets: am oberen Rand nach unten ziehen schließt das Fenster
+  enableSheetDrag(backdrop, modal) {
+    let y0 = null, dy = 0, dragging = false;
+    modal.addEventListener('touchstart', (e) => {
+      const top = e.touches[0].clientY - modal.getBoundingClientRect().top;
+      y0 = modal.scrollTop <= 0 && top < 64 ? e.touches[0].clientY : null;
+      dy = 0; dragging = false;
+    }, { passive: true });
+    modal.addEventListener('touchmove', (e) => {
+      if (y0 == null) return;
+      dy = e.touches[0].clientY - y0;
+      if (dy > 6) {
+        dragging = true;
+        e.preventDefault();
+        modal.style.animation = 'none';
+        modal.style.transition = 'none';
+        modal.style.transform = `translateY(${dy}px)`;
+        backdrop.style.opacity = String(Math.max(0.2, 1 - dy / 500));
+      }
+    }, { passive: false });
+    modal.addEventListener('touchend', () => {
+      if (!dragging) return;
+      dragging = false;
+      if (dy > 110) { this.closeModal(); return; }
+      modal.style.transition = 'transform .32s cubic-bezier(.32,.72,0,1)';
+      modal.style.transform = '';
+      backdrop.style.opacity = '';
+    });
   },
 
   closeModal() {
