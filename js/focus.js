@@ -7,6 +7,28 @@ const FocusView = {
     running: false,
     intervalId: null,
     sessionStart: null,
+    level: 'normal',     // normal | timeout | strict (wie Opal: Reibung beim Abbrechen)
+    intention: '',
+    taskId: null,
+    attempts: 0,
+    stopAt: null,
+  },
+
+  LEVELS: [
+    { key: 'normal', label: 'Normal', desc: 'Jederzeit abbrechbar.' },
+    { key: 'timeout', label: 'Timeout', desc: 'Abbrechen erst nach einer Wartezeit, die bei jedem Versuch länger wird.' },
+    { key: 'strict', label: 'Strikt', desc: 'Nicht abbrechbar – der Fokus läuft bis zum Ende.' },
+  ],
+
+  // Vorbelegen aus Kalender-Block oder Aufgabe (nur wenn nichts läuft)
+  prepare(opts) {
+    const s = this.state;
+    if (s.running) return false;
+    if (opts.minutes) { s.focusMin = Math.max(1, Math.min(180, opts.minutes)); s.mode = 'focus'; s.remaining = s.focusMin * 60; }
+    if (opts.level) s.level = opts.level;
+    s.intention = opts.intention || '';
+    s.taskId = opts.taskId || null;
+    return true;
   },
 
   RADIUS: 42,
@@ -32,18 +54,37 @@ const FocusView = {
       }),
       App.el('div', { class: 'timer-center' }, [
         App.el('div', { class: 'timer-display', id: 'timerDisplay' }, this.fmt(s.remaining)),
-        App.el('div', { class: 'timer-mode', id: 'timerMode' }, s.mode === 'focus' ? 'Fokus' : 'Pause'),
+        App.el('div', { class: 'timer-mode', id: 'timerMode' }, s.mode === 'focus' ? (s.level === 'normal' ? 'Fokus' : `Fokus · ${s.level === 'strict' ? 'Strikt' : 'Timeout'}`) : 'Pause'),
       ]),
     ]);
     wrap.appendChild(ringWrap);
 
+    if (s.intention && s.running) {
+      wrap.appendChild(App.el('div', { class: 'tag', style: 'text-align:center;margin-bottom:12px' }, `Absicht: ${s.intention}`));
+    }
+
+    const locked = s.running && s.mode === 'focus' && s.level === 'strict';
     wrap.appendChild(App.el('div', { class: 'timer-controls' }, [
       App.el('button', {
-        class: 'btn', id: 'toggleBtn',
+        class: 'btn', id: 'toggleBtn', disabled: locked,
         onclick: () => this.toggle(),
-      }, s.running ? 'Pause' : 'Start'),
-      App.el('button', { class: 'btn secondary', onclick: () => this.reset() }, 'Zurücksetzen'),
+      }, locked ? 'Gesperrt' : (s.running ? 'Pause' : 'Start')),
+      App.el('button', { class: 'btn secondary', id: 'resetBtn', disabled: locked, onclick: () => this.guarded(() => this.reset()) }, 'Zurücksetzen'),
     ]));
+
+    if (!s.running) {
+      const intentInput = App.el('input', { type: 'text', value: s.intention, placeholder: 'Woran arbeitest du? (optional)' });
+      intentInput.addEventListener('input', () => { s.intention = intentInput.value; if (s.taskId) s.taskId = null; });
+      wrap.appendChild(App.el('div', { class: 'field' }, [App.el('label', {}, 'Absicht'), intentInput]));
+      wrap.appendChild(App.el('div', { class: 'field' }, [
+        App.el('label', {}, 'Härtegrad'),
+        App.el('div', { class: 'fab-row', style: 'margin-bottom:4px' }, this.LEVELS.map((l) => App.el('button', {
+          class: 'btn secondary' + (s.level === l.key ? ' selected' : ''),
+          onclick: () => { s.level = l.key; App.refresh(); },
+        }, l.label))),
+        App.el('div', { class: 'tag' }, this.LEVELS.find((l) => l.key === s.level).desc),
+      ]));
+    }
 
     if (!s.running) {
       wrap.appendChild(App.el('div', { class: 'row', style: 'justify-content:center;gap:16px;margin-bottom:16px' }, [
@@ -104,14 +145,47 @@ const FocusView = {
   },
 
   toggle() {
-    if (this.state.running) this.pause();
+    if (this.state.running) this.guarded(() => this.pause());
     else this.start();
+  },
+
+  // Härtegrad: Nur im Fokus-Modus wird das Beenden erschwert.
+  guarded(action) {
+    const s = this.state;
+    if (!s.running || s.mode !== 'focus' || s.level === 'normal') return action();
+    if (s.level === 'strict') { Planner.toast('Strikt: Der Fokus läuft bis zum Ende.'); return; }
+    const now = Date.now();
+    if (!s.stopAt) {
+      s.attempts += 1;
+      s.stopAt = now + 10000 * s.attempts;
+      this.updateGuardUI();
+      return;
+    }
+    if (now < s.stopAt) return;
+    s.stopAt = null;
+    action();
+  },
+
+  updateGuardUI() {
+    const s = this.state;
+    const btn = document.getElementById('toggleBtn');
+    const reset = document.getElementById('resetBtn');
+    if (!btn || !s.running) return;
+    if (s.level === 'timeout' && s.stopAt) {
+      const left = Math.ceil((s.stopAt - Date.now()) / 1000);
+      const txt = left > 0 ? `Warte ${left} s …` : 'Jetzt pausieren';
+      btn.textContent = txt;
+      btn.style.opacity = left > 0 ? '.6' : '';
+      if (reset) reset.style.opacity = left > 0 ? '.6' : '';
+    }
   },
 
   start() {
     const s = this.state;
-    if (!s.sessionStart) s.sessionStart = Date.now();
+    if (!s.sessionStart) { s.sessionStart = Date.now(); s.attempts = 0; }
+    s.stopAt = null;
     s.running = true;
+    window.onbeforeunload = s.level === 'strict' && s.mode === 'focus' ? (e) => { e.preventDefault(); e.returnValue = ''; } : null;
     clearInterval(s.intervalId);
     s.intervalId = setInterval(() => this.tick(), 1000);
     App.refresh();
@@ -120,6 +194,8 @@ const FocusView = {
   pause() {
     const s = this.state;
     s.running = false;
+    s.stopAt = null;
+    window.onbeforeunload = null;
     clearInterval(s.intervalId);
     App.refresh();
   },
@@ -128,6 +204,8 @@ const FocusView = {
     const s = this.state;
     clearInterval(s.intervalId);
     s.running = false;
+    s.stopAt = null;
+    window.onbeforeunload = null;
     s.mode = 'focus';
     s.remaining = s.focusMin * 60;
     s.sessionStart = null;
@@ -147,6 +225,7 @@ const FocusView = {
     const display = document.getElementById('timerDisplay');
     if (display) display.textContent = this.fmt(Math.max(0, s.remaining));
     this.updateRing();
+    this.updateGuardUI();
 
     if (s.remaining <= 0) {
       if (s.mode === 'focus') {
@@ -154,7 +233,18 @@ const FocusView = {
           id: DB.uid(),
           startedAt: s.sessionStart || Date.now(),
           duration: s.focusMin * 60,
+          intention: s.intention || '',
+          level: s.level,
+          taskId: s.taskId || null,
         });
+        // Ist-Zeit an der Aufgabe festhalten (Grundlage der lernenden Schätzung)
+        if (s.taskId) {
+          const t = await DB.get('tasks', s.taskId);
+          if (t) { t.actual = (t.actual || 0) + s.focusMin; await DB.put('tasks', t); }
+        }
+        s.stopAt = null;
+        window.onbeforeunload = null;
+        Planner.toast('Fokus geschafft 🎉');
         s.mode = 'break';
         s.remaining = s.breakMin * 60;
       } else {

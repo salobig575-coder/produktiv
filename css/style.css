@@ -394,7 +394,7 @@ main {
 }
 .btn.danger { background: linear-gradient(135deg, #ff6b6b, var(--danger)); box-shadow: 0 10px 24px -10px rgba(229,72,77,.6); }
 
-input[type="text"], input[type="date"], input[type="number"], textarea, select {
+input[type="text"], input[type="date"], input[type="number"], input[type="time"], input[type="email"], input[type="password"], input[type="url"], textarea, select {
   width: 100%;
   background: var(--surface-2);
   border: 1px solid transparent;
@@ -1017,3 +1017,65 @@ a { color: var(--accent); }
   header.topbar h1 { font-size: 30px; }
   .timer-ring-wrap { width: 250px; height: 250px; }
 }
+
+/* ---------- Planer: Timeline ---------- */
+.timeline { position: relative; margin-left: 42px; }
+.tl-hour {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px solid var(--border);
+}
+.tl-hour span {
+  position: absolute; left: -42px; top: -7px; width: 36px; text-align: right;
+  font-size: 10.5px; font-weight: 700; color: var(--text-dim);
+}
+.tl-window {
+  position: absolute; left: 0; right: 0;
+  background: rgba(var(--accent-rgb), .05); border-radius: 8px; pointer-events: none;
+}
+.tl-surface { position: absolute; inset: 0; }
+.tl-block {
+  position: absolute; display: flex; align-items: flex-start; gap: 8px; overflow: hidden;
+  padding: 5px 8px; border-radius: 10px; cursor: pointer;
+  background: rgba(var(--accent-rgb), .16); border-left: 3px solid var(--accent);
+  transition: transform .2s var(--ease), opacity .2s;
+  animation: popIn .35s var(--ease) both;
+}
+.tl-block:active { transform: scale(.98); }
+.tl-block.task { background: var(--surface-2); border-left-color: var(--text-dim); }
+.tl-block.task.high { border-left-color: var(--danger); }
+.tl-block.focus { background: rgba(var(--warn-rgb), .18); border-left-color: var(--warn); }
+.tl-block.done { opacity: .5; }
+.tl-block.done .tl-title { text-decoration: line-through; }
+.tl-block .checkbox { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.tl-block .checkbox svg { width: 12px; height: 12px; }
+.tl-text { min-width: 0; }
+.tl-title { font-size: 13px; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-time { font-size: 11px; color: var(--text-dim); font-weight: 600; margin-top: 1px; }
+.tl-now { position: absolute; left: -4px; right: 0; height: 2px; background: var(--danger); z-index: 3; pointer-events: none; }
+.tl-now::before {
+  content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+}
+
+/* ---------- Planer: Woche ---------- */
+.week-day.today { border-color: var(--accent); }
+.load-bar { height: 6px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.load-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s var(--ease); }
+.load-fill.over { background: var(--danger); }
+.week-item { display: flex; gap: 10px; font-size: 13px; font-weight: 600; }
+.week-item.done { opacity: .5; text-decoration: line-through; }
+.week-time { color: var(--text-dim); font-weight: 700; width: 40px; flex: none; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 28px); transform: translateX(-50%);
+  max-width: calc(100% - 32px); z-index: 300;
+  background: var(--text); color: var(--bg); padding: 11px 18px; border-radius: 14px;
+  font-size: 14px; font-weight: 700; box-shadow: var(--shadow-lg);
+  animation: popIn .35s var(--ease) both; transition: opacity .4s;
+}
+.toast.hide { opacity: 0; }
+
+/* ---------- Planer: Routinen-Blöcke ---------- */
+.tl-block.habit { background: transparent; border: 1.5px dashed var(--accent); border-left-width: 3px; border-left-style: solid; }
+.tl-block.habit.done { background: rgba(var(--accent-rgb), .08); }
+.btn[disabled] { opacity: .5; pointer-events: none; }

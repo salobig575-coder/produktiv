@@ -1,0 +1,10 @@
+{
+  "appId": "app.produktiv.planer",
+  "appName": "Produktiv",
+  "webDir": "www",
+  "backgroundColor": "#0a0d16",
+  "ios": { "contentInset": "always" },
+  "plugins": {
+    "LocalNotifications": { "smallIcon": "ic_stat_icon", "iconColor": "#16a34a" }
+  }
+}
