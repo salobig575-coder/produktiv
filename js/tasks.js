@@ -99,9 +99,14 @@ const TasksView = {
     t.done = !t.done;
     t.updatedAt = Date.now();
     if (btn) btn.classList.add('pop');
+    if (t.done) {
+      App.confetti(btn, 10);
+      const row = btn && btn.closest('.line');
+      if (row && this.filter === 'open') row.classList.add('leaving');
+    }
     await DB.put('tasks', t);
     if (t.done) await Planner.spawnNext(t);
-    setTimeout(() => App.refresh(), t.done ? 220 : 0);
+    setTimeout(() => App.refresh(), t.done ? 320 : 0);
   },
 
   async remove(t, e) {

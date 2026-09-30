@@ -2,7 +2,7 @@ const TodayView = {
   // Leichte Listenzeile statt eigener Box – hält den Tab ruhig.
   line({ check, checked, onCheck, title, meta, right, onClick }) {
     return App.el('div', { class: 'line' }, [
-      check ? App.el('button', { class: 'checkbox' + (checked ? ' checked' : ''), html: Icons.check(), onclick: (e) => { e.currentTarget.classList.add('checked', 'pop'); onCheck(); } }) : App.el('span', { class: 'line-dot' }),
+      check ? App.el('button', { class: 'checkbox' + (checked ? ' checked' : ''), html: Icons.check(), onclick: (e) => { e.currentTarget.classList.add('checked', 'pop'); App.confetti(e.currentTarget, 10); onCheck(); } }) : App.el('span', { class: 'line-dot' }),
       App.el('div', { class: 'line-main', style: onClick ? 'cursor:pointer' : '', onclick: onClick }, [
         App.el('div', { class: 'item-title' }, title),
         meta ? App.el('div', { class: 'tag' }, meta) : null,
@@ -90,7 +90,11 @@ const TodayView = {
     const latestWeight = weightEnabled ? await BodyMetrics.latest() : null;
     const sessions = await DB.getAll('focusSessions');
     const focusMin = Math.round(sessions.filter((x) => App.todayStr(new Date(x.startedAt)) === today).reduce((sum, x) => sum + x.duration, 0) / 60);
-    const mini = (n, l) => App.el('div', { class: 'mini' }, [App.el('div', { class: 'mini-num' }, String(n)), App.el('div', { class: 'mini-lbl' }, l)]);
+    const mini = (n, l) => {
+      const num = App.el('div', { class: 'mini-num' }, String(n));
+      if (typeof n === 'number' && n > 0) requestAnimationFrame(() => App.animateCounter(num, n, { from: 0, duration: 700 }));
+      return App.el('div', { class: 'mini' }, [num, App.el('div', { class: 'mini-lbl' }, l)]);
+    };
     wrap.appendChild(App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Fortschritt']),
       App.el('div', { class: 'mini-row' }, [
@@ -133,17 +137,17 @@ const TodayView = {
       PlanenHub.activeTab = 'focus';
       App.navigate('planen');
     };
-    const btn = (label, fn, secondary) => App.el('button', { class: 'btn' + (secondary ? ' secondary' : ''), style: 'flex:1;margin:0', onclick: fn }, label);
+    const btn = (label, fn, secondary) => App.el('button', { class: 'btn' + (secondary ? ' secondary' : ''), style: 'flex:1;margin:0', onclick: (e) => fn(e) }, label);
     const actions = (nodes) => card.appendChild(App.el('div', { class: 'row', style: 'margin-top:12px' }, nodes));
 
     if (current) {
       const pct = Math.round(((now - current.start) / (current.end - current.start)) * 100);
       card.appendChild(App.el('div', { style: 'font-size:19px;font-weight:800' }, current.title));
       card.appendChild(App.el('div', { class: 'tag', style: 'margin:2px 0 10px' }, `${Planner.fmt(current.start)}–${Planner.fmt(current.end)} · noch ${Planner.fmtDur(current.end - now)}`));
-      card.appendChild(App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill', style: `width:${pct}%` })]));
+      card.appendChild(App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill live', style: `width:${pct}%` })]));
       if (current.type === 'task') {
         actions([
-          btn('Erledigt', async () => { current.ref.done = true; current.ref.updatedAt = Date.now(); await DB.put('tasks', current.ref); await Planner.spawnNext(current.ref); App.refresh(); }, true),
+          btn('Erledigt', async (e) => { App.confetti(e.currentTarget, 22); current.ref.done = true; current.ref.updatedAt = Date.now(); await DB.put('tasks', current.ref); await Planner.spawnNext(current.ref); setTimeout(() => App.refresh(), 450); }, true),
           btn('Fokus starten', () => goFocus({ minutes: Math.min(current.end - now, 120), intention: current.title, taskId: current.id })),
         ]);
       } else if (current.type === 'habit') {

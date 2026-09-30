@@ -226,6 +226,27 @@ const App = {
     }
   },
 
+  // Kleines Konfetti-Feuerwerk an einem Element (oder Bildschirmmitte)
+  confetti(origin, count = 16) {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const r = origin && origin.getBoundingClientRect ? origin.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const colors = ['#34d399', '#4ade80', '#f5a524', '#60a5fa', '#f472b6'];
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 90;
+      const p = document.createElement('span');
+      p.className = 'confetti';
+      p.style.left = x + 'px';
+      p.style.top = y + 'px';
+      p.style.background = colors[i % colors.length];
+      p.style.setProperty('--dx', Math.cos(a) * d + 'px');
+      p.style.setProperty('--dy', Math.sin(a) * d - 30 + 'px');
+      p.style.setProperty('--rot', Math.round(Math.random() * 540 - 270) + 'deg');
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1000);
+    }
+  },
+
   animateCounter(el, to, opts = {}) {
     if (!el) return;
     const duration = opts.duration || 500;

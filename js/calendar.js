@@ -14,6 +14,9 @@ const CalendarView = {
     const data = await Planner.load();
     const s = data.s;
 
+    // Richtung des Tageswechsels (nur beim Wechsel innerhalb der Kalenderansicht)
+    const dir = this._lastDate && this._lastDate !== this.selectedDate ? (this.selectedDate > this._lastDate ? 'slide-r' : 'slide-l') : '';
+    this._lastDate = this.selectedDate;
     wrap.appendChild(this.renderHeader(Holidays.name(this.selectedDate, s.holidays)));
     wrap.appendChild(this.renderQuickAdd());
 
@@ -22,13 +25,16 @@ const CalendarView = {
       return wrap;
     }
 
-    wrap.appendChild(this.renderDateStrip(data));
+    const strip = this.renderDateStrip(data);
+    wrap.appendChild(strip);
     const items = Planner.dayItems(this.selectedDate, data);
     this.renderWelcome(wrap, data);
     this.renderMissed(wrap, data);
     this.renderRituals(wrap, items, data);
     wrap.appendChild(this.renderSummary(items, s, data));
-    wrap.appendChild(this.renderTimeline(items, s));
+    const tlCard = this.renderTimeline(items, s);
+    if (dir) { tlCard.classList.add(dir); strip.classList.add(dir); }
+    wrap.appendChild(tlCard);
     wrap.appendChild(this.renderInbox(data));
 
     let x0 = 0, y0 = 0;

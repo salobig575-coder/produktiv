@@ -247,6 +247,7 @@ const FocusView = {
         s.stopAt = null;
         window.onbeforeunload = null;
         Planner.toast('Fokus geschafft 🎉');
+        App.confetti(document.getElementById('ringWrap'), 30);
         s.mode = 'break';
         s.remaining = s.breakMin * 60;
       } else {

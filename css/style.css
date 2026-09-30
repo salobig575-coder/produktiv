@@ -1188,3 +1188,70 @@ a { color: var(--accent); }
 .yc.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .yc.hol { box-shadow: inset 0 0 0 1.5px var(--warn); }
+
+/* ================= Animationen (Feinschliff) ================= */
+/* Karten erscheinen nacheinander */
+#view > div > .card:nth-child(2), #view > div > .today-head + .card { animation-delay: .04s; }
+#view > div > .card:nth-child(3) { animation-delay: .08s; }
+#view > div > .card:nth-child(4) { animation-delay: .12s; }
+#view > div > .card:nth-child(5) { animation-delay: .16s; }
+#view > div > .card:nth-child(6) { animation-delay: .2s; }
+.today-head { animation: fadeSlideIn .4s var(--ease) both; }
+
+/* Tag wechseln: Timeline und Datumsleiste gleiten in Richtung der Navigation */
+@keyframes slideFromRight { 0% { opacity: 0; transform: translateX(28px); } 100% { opacity: 1; transform: translateX(0); } }
+@keyframes slideFromLeft { 0% { opacity: 0; transform: translateX(-28px); } 100% { opacity: 1; transform: translateX(0); } }
+.slide-r { animation: slideFromRight .35s var(--ease) both !important; }
+.slide-l { animation: slideFromLeft .35s var(--ease) both !important; }
+
+/* Umschalter: aktives Segment federt ein */
+@keyframes segPop { 0% { transform: scale(.88); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+.seg button.active { animation: segPop .32s var(--ease-spring); }
+
+/* Balken wachsen von links */
+@keyframes barGrow { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+.load-fill { transform-origin: left; animation: barGrow .8s var(--ease) both; }
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.load-bar { position: relative; overflow: hidden; }
+.load-fill.live { position: relative; overflow: hidden; }
+.load-fill.live::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Jetzt-Linie pulsiert */
+@keyframes nowPulse { 0% { box-shadow: 0 0 0 0 rgba(var(--danger-rgb), .55); } 70% { box-shadow: 0 0 0 7px rgba(var(--danger-rgb), 0); } 100% { box-shadow: 0 0 0 0 rgba(var(--danger-rgb), 0); } }
+.tl-now::before { animation: nowPulse 2s ease-out infinite; }
+
+/* Zeilen verlassen die Liste weich */
+@keyframes lineOut { 0% { opacity: 1; transform: translateX(0); max-height: 90px; } 60% { opacity: 0; transform: translateX(26px); max-height: 90px; } 100% { opacity: 0; transform: translateX(26px); max-height: 0; padding-top: 0; padding-bottom: 0; } }
+.line.leaving { animation: lineOut .32s var(--ease) forwards !important; overflow: hidden; }
+
+/* Toast: feder von unten, bleibt dabei mittig (vorher sprang er kurz) */
+@keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, 18px) scale(.95); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+.toast { animation: toastIn .38s var(--ease-spring) both; }
+
+/* Konfetti bei Erfolgen */
+@keyframes confettiFly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.6); }
+}
+.confetti {
+  position: fixed; z-index: 400; width: 8px; height: 12px; border-radius: 2px; pointer-events: none;
+  animation: confettiFly .95s cubic-bezier(.16, .84, .44, 1) forwards;
+}
+
+/* Kleine Rückmeldungen */
+.fab-mini, .btn, .chip, .seg button { will-change: transform; }
+@keyframes chipPop { 0% { transform: scale(.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.chip.on { animation: chipPop .3s var(--ease-spring); }
+.year-month { animation: popIn .4s var(--ease) both; }
+.year-month:nth-child(3n+2) { animation-delay: .04s; }
+.year-month:nth-child(3n) { animation-delay: .08s; }
+
+/* Wer Bewegung reduziert haben möchte, bekommt keine */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .confetti { display: none; }
+}
