@@ -73,13 +73,57 @@ const TasksView = {
       t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
       t.priority === 'high' ? App.el('span', { class: 'pill overdue' }, 'Hoch') : null,
     ].filter(Boolean);
-    return App.el('div', { class: 'line' + (t.done ? ' done' : ''), style: `animation:popIn .35s var(--ease) both;animation-delay:${Math.min(i, 8) * 25}ms` }, [
+    const line = App.el('div', { class: 'line' + (t.done ? ' done' : ''), style: `animation:popIn .35s var(--ease) both;animation-delay:${Math.min(i, 8) * 25}ms` }, [
       App.el('button', { class: 'checkbox' + (t.done ? ' checked' : ''), html: Icons.check(), onclick: (e) => this.toggleDone(t, e.currentTarget) }),
       App.el('div', { class: 'line-main', style: 'cursor:pointer', onclick: () => this.openEditor(t) }, [
         App.el('div', { class: 'item-title', style: 'white-space:normal' }, t.title),
         pills.length ? App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;margin-top:4px' }, pills) : null,
       ]),
     ]);
+    return this.gestures(line, t);
+  },
+
+  // ---------- Gesten: Wischen und langes Drücken ----------
+  // Rechts wischen = erledigt, links wischen = Morgen / Löschen, lang drücken = Menü
+  swipeCfg(t) {
+    return {
+      right: { label: t.done ? '↺ Wieder offen' : '✓ Erledigt', color: '#16a34a', fn: () => this.toggleDone(t) },
+      left: [
+        { label: 'Morgen', color: '#f5a524', fn: () => this.setDue(t, Planner.addDays(App.todayStr(), 1), 'Auf morgen verschoben.') },
+        { label: 'Löschen', color: '#e5484d', fn: () => this.deleteTask(t) },
+      ],
+    };
+  },
+
+  gestures(row, t, cfg) {
+    Gestures.longPress(row, () => Gestures.actionSheet(t.title, this.actionsFor(t)));
+    return Gestures.swipeable(row, cfg || this.swipeCfg(t));
+  },
+
+  actionsFor(t) {
+    const today = App.todayStr();
+    return [
+      { label: t.done ? 'Wieder öffnen' : 'Erledigt', fn: () => this.toggleDone(t) },
+      { label: 'Fällig heute', fn: () => this.setDue(t, today, 'Auf heute gelegt.') },
+      { label: 'Fällig morgen', fn: () => this.setDue(t, Planner.addDays(today, 1), 'Auf morgen verschoben.') },
+      { label: 'Fällig nächste Woche', fn: () => this.setDue(t, Planner.addDays(today, 7), 'Auf nächste Woche verschoben.') },
+      t.done ? null : { label: 'Jetzt einplanen', fn: async () => { if (!(await Planner.scheduleTask(t, today))) Planner.toast('Heute ist kein Platz mehr frei.'); App.refresh(); } },
+      t.done ? null : { label: 'Fokus starten', fn: () => {
+        if (FocusView.prepare({ minutes: Math.min(t.duration || 25, 120), intention: t.title, taskId: t.id })) { PlanenHub.activeTab = 'focus'; App.navigate('planen', { animate: true }); }
+        else Planner.toast('Es läuft bereits ein Fokus.');
+      } },
+      { label: 'Bearbeiten', fn: () => this.openEditor(t) },
+      { label: 'Löschen', danger: true, fn: () => this.deleteTask(t) },
+    ];
+  },
+
+  async setDue(t, date, msg) {
+    const before = t.dueDate || '';
+    t.dueDate = date;
+    t.updatedAt = Date.now();
+    await DB.put('tasks', t);
+    App.refresh();
+    Planner.toast(msg, { label: 'Rückgängig', fn: async () => { t.dueDate = before; await DB.put('tasks', t); App.refresh(); } });
   },
 
   filterBtn(key, label) {

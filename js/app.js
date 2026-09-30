@@ -20,6 +20,7 @@ const App = {
     document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
 
     this.bindShortcuts();
+    this.bindGestures();
 
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
@@ -54,6 +55,75 @@ const App = {
       if (has === 0) return;
       Planner.toast('Backup fällig – deine Daten liegen nur auf diesem Gerät.', { label: 'Sichern', fn: () => SettingsView.exportFile() });
     } catch (e) {}
+  },
+
+  // Nächster/vorheriger Tab bzw. Bereich (Reihenfolge: Heute – Planen-Tabs – Fitness-Tabs)
+  stepTab(dir) {
+    const hub = { planen: PlanenHub, fitness: FitnessHub }[this.current];
+    if (hub) {
+      const i = hub.tabs.findIndex((t) => t.key === hub.activeTab), n = i + dir;
+      if (n >= 0 && n < hub.tabs.length) { hub.activeTab = hub.tabs[n].key; this.navigate(this.current, { animate: true }); return; }
+    }
+    const r = this.routeOrder.indexOf(this.current) + dir;
+    if (r >= 0 && r < this.routeOrder.length) {
+      const next = this.routeOrder[r], nh = { planen: PlanenHub, fitness: FitnessHub }[next];
+      if (nh) nh.activeTab = dir > 0 ? nh.tabs[0].key : nh.tabs[nh.tabs.length - 1].key;
+      this.navigate(next);
+    }
+  },
+
+  // Globale Gesten: vom Rand wischen (zurück/Tab wechseln), nach unten ziehen zum Aktualisieren
+  bindGestures() {
+    Gestures.install();
+    const ptr = this.el('div', { id: 'ptr', html: Icons.sparkles() });
+    document.body.appendChild(ptr);
+    let x0 = 0, y0 = 0, edge = 0, ptrOk = false, pulling = false, pull = 0, busy = false;
+    const reset = () => { ptr.style.transition = 'transform .3s cubic-bezier(.32,.72,0,1), opacity .3s'; ptr.style.transform = 'translate(-50%, -60px)'; ptr.style.opacity = '0'; ptr.classList.remove('spin'); };
+
+    document.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      x0 = t.clientX; y0 = t.clientY; pulling = false; pull = 0;
+      edge = t.clientX < 22 ? -1 : (t.clientX > window.innerWidth - 22 ? 1 : 0);
+      ptrOk = !busy && !edge && !this._modal && window.scrollY <= 0 &&
+        !e.target.closest('.tl-scroll, .date-strip, .tab-bar, input, textarea, select, #splash');
+      ptr.style.transition = 'none';
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!ptrOk) return;
+      const t = e.touches[0], dy = t.clientY - y0, dx = t.clientX - x0;
+      if (!pulling) {
+        if (dy > 12 && Math.abs(dx) < dy) pulling = true; else return;
+      }
+      if (e.cancelable) e.preventDefault();
+      pull = Math.min(dy * 0.5, 84);
+      ptr.style.opacity = String(Math.min(1, pull / 40));
+      ptr.style.transform = `translate(-50%, ${pull - 40}px) rotate(${pull * 4}deg)`;
+    }, { passive: false });
+
+    document.addEventListener('touchend', async (e) => {
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      if (pulling) {
+        pulling = false;
+        if (pull >= 46 && !busy) {
+          busy = true;
+          ptr.style.transition = 'transform .25s cubic-bezier(.32,.72,0,1)';
+          ptr.style.transform = 'translate(-50%, 34px)';
+          ptr.classList.add('spin');
+          try { if (typeof Sync !== 'undefined') await Sync.run(); } catch (err) {}
+          await new Promise((r) => setTimeout(r, 350));
+          this.refresh();
+          busy = false;
+        }
+        reset();
+        return;
+      }
+      // Vom Rand wischen: links → zurück (Fenster schließen) bzw. vorheriger Tab, rechts → nächster Tab
+      if (edge !== 0 && Math.abs(dy) < 70) {
+        if (edge === -1 && dx > 70) { if (this._modal) this.closeModal(); else this.stepTab(-1); }
+        else if (edge === 1 && dx < -70 && !this._modal) this.stepTab(1);
+      }
+    }, { passive: true });
   },
 
   // Tastenkürzel für Mac und PC (greifen nicht beim Tippen in Feldern)
