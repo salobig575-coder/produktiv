@@ -298,7 +298,7 @@ const WorkoutsView = {
     const renderPick = async () => {
       if (!exAll) exAll = await Exercises.all();
       const q = pickQuery.trim().toLowerCase();
-      const items = exAll.filter((ex) => (pickMuscle === 'all' || ex.primaryMuscle === pickMuscle) && (!q || ex.name.toLowerCase().includes(q)));
+      const items = exAll.filter((ex) => (pickMuscle === 'all' || ex.primaryMuscle === pickMuscle) && Exercises.matches(ex, q));
 
       const search = App.el('input', { type: 'text', placeholder: 'Übung suchen…', value: pickQuery, oninput: (e) => { pickQuery = e.target.value; renderBody(); } });
       const muscleTabs = App.tabBar([{ key: 'all', label: 'Alle' }, ...MUSCLE_GROUPS.map((m) => ({ key: m, label: m }))], pickMuscle, (key) => { pickMuscle = key; renderBody(); });

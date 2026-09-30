@@ -195,6 +195,11 @@ const SettingsView = {
         } }, 'Neueste Version laden'),
       ]),
       App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Quellen & Lizenzen']),
+        App.el('p', { class: 'tag', style: 'margin:0 0 8px;line-height:1.5' }, 'Übungen: eigene Auswahl sowie die freie „free-exercise-db“ (Public Domain, github.com/yuhonas/free-exercise-db).'),
+        App.el('p', { class: 'tag', style: 'margin:0;line-height:1.5' }, 'Weitere Übungen von wger.de (github.com/wger-project/wger), lizenziert unter Creative Commons Attribution-ShareAlike (CC-BY-SA 3/4) bzw. CC0. Autor und Lizenz stehen in der Detailansicht jeder Übung.'),
+      ]),
+      App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'App installieren']),
         App.el('p', { class: 'tag' }, 'Am Handy: Browser-Menü → „Zum Startbildschirm hinzufügen“. Am PC: Adressleiste → Install-Symbol.'),
       ]),
