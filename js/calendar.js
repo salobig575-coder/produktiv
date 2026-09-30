@@ -262,12 +262,16 @@ const CalendarView = {
       }
     }
 
-    const card = App.el('div', { class: 'card', style: 'padding:12px 12px 12px 8px;overflow:hidden' }, [tl]);
-    if (!this._scrolled) {
-      this._scrolled = true;
-      const anchor = nowLine || surface.querySelector('.tl-block');
-      if (anchor) setTimeout(() => anchor.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
-    }
+    // Eigener Scrollbereich: die Seite bleibt oben stehen, nur die Uhrzeiten scrollen.
+    const scroller = App.el('div', { class: 'tl-scroll' }, [tl]);
+    const card = App.el('div', { class: 'card', style: 'padding:12px 12px 12px 8px;overflow:hidden' }, [scroller]);
+    scroller.addEventListener('scroll', () => { this._tlScroll = scroller.scrollTop; }, { passive: true });
+    const anchor = nowLine || surface.querySelector('.tl-block');
+    setTimeout(() => {
+      if (this._scrollDate === this.selectedDate && this._tlScroll != null) scroller.scrollTop = this._tlScroll;
+      else if (anchor) scroller.scrollTop = Math.max(0, anchor.offsetTop - scroller.clientHeight / 3);
+      this._scrollDate = this.selectedDate;
+    }, 30);
     return card;
   },
 

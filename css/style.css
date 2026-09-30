@@ -168,7 +168,7 @@ header.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 20px 10px;
+  padding: calc(22px + env(safe-area-inset-top)) 20px 10px;
   background: linear-gradient(var(--bg) 60%, rgba(var(--bg-rgb), 0));
   backdrop-filter: blur(6px);
 }
@@ -1162,3 +1162,6 @@ a { color: var(--accent); }
 .line.done .item-title { text-decoration: line-through; }
 .week-day.empty-day { box-shadow: none; background: transparent; border-style: dashed; }
 .week-day.empty-day.today { border-style: solid; }
+
+.tl-scroll { max-height: min(62vh, 560px); overflow-y: auto; overscroll-behavior: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tl-scroll::-webkit-scrollbar { display: none; }
