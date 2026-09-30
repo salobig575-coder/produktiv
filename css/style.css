@@ -671,11 +671,15 @@ nav.bottomnav button:active { transform: scale(.9); }
   content: "";
   display: block;
   width: 40px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 4px;
+  height: 5px;
+  background: var(--text-dim);
+  opacity: .35;
+  border-radius: 5px;
   margin: -8px auto 16px;
+  box-shadow: 0 0 0 14px transparent; /* größere Greiffläche */
 }
+.modal.sheet-grab, .modal.sheet-grab * { cursor: grab; }
+.modal.sheet-dragging, .modal.sheet-dragging * { cursor: grabbing; user-select: none; }
 .modal h3 { margin: 0 0 16px; font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
 
 .stat-row { display: flex; flex-wrap: wrap; gap: 10px; }

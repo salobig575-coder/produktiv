@@ -231,34 +231,73 @@ const App = {
     return backdrop;
   },
 
-  // Wie bei iOS-Sheets: am oberen Rand nach unten ziehen schließt das Fenster
+  // Wie bei iOS-Sheets: Nach unten ziehen schließt das Fenster – am Balken (auch mit der Maus) oder überall im Inhalt,
+  // sobald er ganz oben ist. Schnelles Wischen reicht ebenfalls.
   enableSheetDrag(backdrop, modal) {
-    let y0 = null, dy = 0, dragging = false;
-    modal.addEventListener('touchstart', (e) => {
-      const top = e.touches[0].clientY - modal.getBoundingClientRect().top;
-      y0 = modal.scrollTop <= 0 && top < 64 ? e.touches[0].clientY : null;
-      dy = 0; dragging = false;
-    }, { passive: true });
-    modal.addEventListener('touchmove', (e) => {
-      if (y0 == null) return;
-      dy = e.touches[0].clientY - y0;
-      if (dy > 6) {
-        dragging = true;
-        e.preventDefault();
-        modal.style.animation = 'none';
-        modal.style.transition = 'none';
-        modal.style.transform = `translateY(${dy}px)`;
-        backdrop.style.opacity = String(Math.max(0.2, 1 - dy / 500));
-      }
-    }, { passive: false });
-    modal.addEventListener('touchend', () => {
+    const ease = 'cubic-bezier(.32,.72,0,1)';
+    let y0 = 0, x0 = 0, dy = 0, t0 = 0, dragging = false, active = false, fromHandle = false;
+
+    const begin = (x, y, handle) => { x0 = x; y0 = y; dy = 0; t0 = performance.now(); dragging = false; active = true; fromHandle = handle; };
+    const drag = (dyNow) => {
+      dy = Math.max(0, dyNow);
+      if (!dragging) { dragging = true; modal.style.animation = 'none'; modal.style.transition = 'none'; modal.classList.add('sheet-dragging'); }
+      modal.style.transform = `translateY(${dy}px)`;
+      backdrop.style.opacity = String(Math.max(0.15, 1 - dy / 450));
+    };
+    const finish = () => {
+      active = false;
       if (!dragging) return;
       dragging = false;
-      if (dy > 110) { this.closeModal(); return; }
-      modal.style.transition = 'transform .32s cubic-bezier(.32,.72,0,1)';
-      modal.style.transform = '';
-      backdrop.style.opacity = '';
+      modal.classList.remove('sheet-dragging');
+      const speed = dy / Math.max(1, performance.now() - t0); // px pro ms
+      if (dy > 120 || (dy > 40 && speed > 0.6)) {
+        this._modal = null;
+        modal.style.transition = `transform .28s ${ease}`;
+        backdrop.style.transition = 'opacity .28s linear';
+        modal.style.transform = 'translateY(105%)';
+        backdrop.style.opacity = '0';
+        setTimeout(() => backdrop.remove(), 300);
+      } else {
+        modal.style.transition = `transform .34s ${ease}`;
+        modal.style.transform = '';
+        backdrop.style.transition = 'opacity .34s linear';
+        backdrop.style.opacity = '';
+      }
+    };
+
+    // Touch (iPhone): oben im Inhalt nach unten ziehen
+    modal.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      begin(t.clientX, t.clientY, t.clientY - modal.getBoundingClientRect().top < 56);
+    }, { passive: true });
+    modal.addEventListener('touchmove', (e) => {
+      if (!active) return;
+      const t = e.touches[0];
+      const dyRaw = t.clientY - y0, dxRaw = t.clientX - x0;
+      if (!dragging) {
+        if (modal.scrollTop > 0 && !fromHandle) { y0 = t.clientY; return; } // erst ganz nach oben scrollen
+        if (dyRaw <= 8 || Math.abs(dxRaw) > Math.abs(dyRaw)) return;
+      }
+      if (e.cancelable) e.preventDefault();
+      drag(dyRaw);
+    }, { passive: false });
+    modal.addEventListener('touchend', finish);
+    modal.addEventListener('touchcancel', finish);
+
+    // Maus (Mac/PC): am oberen Rand greifen
+    modal.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      if (e.clientY - modal.getBoundingClientRect().top > 44) return;
+      begin(e.clientX, e.clientY, true);
+      modal.setPointerCapture(e.pointerId);
     });
+    modal.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const overHandle = e.clientY - modal.getBoundingClientRect().top < 44;
+      modal.classList.toggle('sheet-grab', overHandle || dragging);
+      if (active && Math.abs(e.clientY - y0) > 4) drag(e.clientY - y0);
+    });
+    modal.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') finish(); });
   },
 
   closeModal() {
@@ -266,7 +305,7 @@ const App = {
       const m = this._modal;
       this._modal = null;
       m.classList.add('closing');
-      setTimeout(() => m.remove(), 200);
+      setTimeout(() => m.remove(), 300);
     }
   },
 
