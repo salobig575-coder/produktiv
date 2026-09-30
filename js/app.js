@@ -410,6 +410,16 @@ const App = {
   },
 
   _fid: 0,
+  // Gestalteter Leer-Zustand: Symbol in Kachel, Titel, kurzer Hinweis, optional ein Knopf
+  emptyState({ icon, title, sub, action }) {
+    return this.el('div', { class: 'empty-state' }, [
+      this.el('div', { class: 'es-icon', html: Icons[icon]() }),
+      this.el('div', { class: 'es-title' }, title),
+      sub ? this.el('div', { class: 'es-sub' }, sub) : null,
+      action ? this.el('button', { class: 'btn', onclick: action.fn }, action.label) : null,
+    ]);
+  },
+
   // Verknüpft <label> und Eingabefeld innerhalb von .field (Screenreader lesen so den Feldnamen vor)
   linkLabels(root) {
     root.querySelectorAll('.field').forEach((f) => {

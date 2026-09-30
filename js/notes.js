@@ -32,10 +32,9 @@ const NotesView = {
     const q = this.query.toLowerCase();
     const filtered = q ? notes.filter((n) => (n.title + ' ' + n.content).toLowerCase().includes(q)) : notes;
     if (filtered.length === 0) {
-      list.appendChild(App.el('div', { class: 'empty' }, [
-        App.el('div', { class: 'empty-icon', html: Icons.notes() }),
-        'Keine Notizen gefunden.',
-      ]));
+      list.appendChild(notes.length === 0
+        ? App.emptyState({ icon: 'notes', title: 'Noch keine Notizen', sub: 'Halte Ideen, Listen und Gedanken fest – alles bleibt durchsuchbar.' })
+        : App.emptyState({ icon: 'search', title: 'Nichts gefunden', sub: 'Versuche einen anderen Suchbegriff.' }));
       return;
     }
     filtered.forEach((n, i) => {

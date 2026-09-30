@@ -14,10 +14,7 @@ const HabitsView = {
     wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     if (habits.length === 0) {
-      wrap.appendChild(App.el('div', { class: 'empty' }, [
-        App.el('div', { class: 'empty-icon', html: Icons.habits() }),
-        'Noch keine Gewohnheiten angelegt.',
-      ]));
+      wrap.appendChild(App.emptyState({ icon: 'habits', title: 'Noch keine Gewohnheiten', sub: 'Lege Routinen an. Mit Zeitfenster planen sie sich selbst um deine Termine herum.' }));
       return wrap;
     }
 
