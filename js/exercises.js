@@ -1,5 +1,5 @@
 const MUSCLE_GROUPS = ['Brust', 'Rücken', 'Beine', 'Schultern', 'Bizeps', 'Trizeps', 'Unterarm', 'Bauch'];
-const EXERCISE_SEED_VERSION = 2;
+const EXERCISE_SEED_VERSION = 3;
 
 const EXERCISE_SEED_CURATED = [
   // Brust
@@ -84,10 +84,33 @@ const EXERCISE_SEED_CURATED = [
 
 // EXERCISE_DB_IMPORT is defined in js/exerciseDb.js (876 exercises, public domain,
 // source: https://github.com/yuhonas/free-exercise-db)
+// EXERCISE_DB_WGER (js/exerciseDb2.js): weitere Übungen von wger.de, CC-BY-SA – mit Autor und Lizenz je Eintrag.
 const EXERCISE_SEED = EXERCISE_SEED_CURATED.concat(
   (typeof EXERCISE_DB_IMPORT !== 'undefined' ? EXERCISE_DB_IMPORT : [])
+    .map((e) => ({ secondaryMuscles: [], variants: [], custom: false, videoUrl: '', images: [], ...e })),
+  (typeof EXERCISE_DB_WGER !== 'undefined' ? EXERCISE_DB_WGER : [])
     .map((e) => ({ secondaryMuscles: [], variants: [], custom: false, videoUrl: '', images: [], ...e }))
 );
+
+// Deutsche Suchbegriffe: Die meisten Namen sind englisch. Damit „Kniebeuge“ oder „Kurzhantel Bankdrücken“ trotzdem treffen,
+// wird zu jedem Namen eine deutsche Übersetzung der Schlüsselwörter mitgesucht (nur für die Suche, nicht zur Anzeige).
+const EXERCISE_DE_TERMS = [
+  ['bench press', 'bankdrücken'], ['shoulder press', 'schulterdrücken'], ['overhead press', 'schulterdrücken'], ['military press', 'schulterdrücken'],
+  ['leg press', 'beinpresse'], ['leg curl', 'beincurl beinbeuger'], ['leg extension', 'beinstrecker'], ['lat pulldown', 'latziehen latzug'], ['pull down', 'latziehen'], ['pulldown', 'latziehen'],
+  ['face pull', 'face pull'], ['hip thrust', 'hüftheben hip thrust'], ['good morning', 'good morning'], ['hack squat', 'hackenschmidt kniebeuge'], ['step-up', 'step-up aufsteiger'],
+  ['calf raise', 'wadenheben'], ['lateral raise', 'seitheben'], ['front raise', 'frontheben'], ['rear delt', 'hintere schulter'], ['pull-up', 'klimmzug'], ['pull up', 'klimmzug'], ['pullup', 'klimmzug'],
+  ['chin-up', 'klimmzug untergriff'], ['chin up', 'klimmzug untergriff'], ['push-up', 'liegestütz'], ['push up', 'liegestütz'], ['pushup', 'liegestütz'], ['sit-up', 'sit-up'], ['situp', 'sit-up'],
+  ['close grip', 'enger griff'], ['close-grip', 'enger griff'], ['wide grip', 'weiter griff'], ['wide-grip', 'weiter griff'], ['narrow', 'eng'], ['single arm', 'einarmig'], ['one arm', 'einarmig'], ['single-arm', 'einarmig'], ['one-arm', 'einarmig'],
+  ['single leg', 'einbeinig'], ['one leg', 'einbeinig'], ['single-leg', 'einbeinig'], ['lower back', 'unterer rücken'], ['body weight', 'körpergewicht'], ['bodyweight', 'körpergewicht'],
+  ['squat', 'kniebeuge'], ['deadlift', 'kreuzheben'], ['romanian', 'rumänisch'], ['curl', 'curl bizepscurl'], ['lunge', 'ausfallschritt'], ['crunch', 'crunch bauchpresse'], ['plank', 'unterarmstütz plank'],
+  ['fly', 'fliegende butterfly'], ['flye', 'fliegende butterfly'], ['butterfly', 'butterfly fliegende'], ['extension', 'strecken'], ['pushdown', 'drücken'], ['skull', 'stirndrücken skullcrusher'], ['dip', 'dips'], ['shrug', 'schulterheben shrugs'],
+  ['raise', 'heben'], ['press', 'drücken'], ['row', 'rudern'], ['rowing', 'rudern'], ['pullover', 'überzug'], ['swing', 'swing'], ['clean', 'umsetzen'], ['snatch', 'reißen'], ['jerk', 'stoßen'], ['carry', 'tragen'],
+  ['tricep', 'trizeps'], ['bicep', 'bizeps'], ['glute', 'gesäß'], ['bridge', 'brücke'], ['barbell', 'langhantel'], ['dumbbell', 'kurzhantel'], ['cable', 'kabelzug'], ['machine', 'maschine'], ['kettlebell', 'kettlebell'],
+  ['band', 'band'], ['seated', 'sitzend'], ['sitting', 'sitzend'], ['standing', 'stehend'], ['lying', 'liegend'], ['incline', 'schräg'], ['decline', 'negativ'], ['reverse', 'umgekehrt'], ['alternating', 'wechselnd'],
+  ['jump', 'sprung'], ['stretch', 'dehnung'], ['twist', 'drehung'], ['rotation', 'rotation'], ['abs', 'bauch'], ['abdominal', 'bauch'], ['back', 'rücken'], ['chest', 'brust'], ['shoulder', 'schulter'],
+  ['forearm', 'unterarm'], ['wrist', 'handgelenk'], ['neck', 'nacken'], ['hip', 'hüfte'], ['thigh', 'oberschenkel'], ['hamstring', 'beinbeuger'], ['quad', 'quadrizeps'], ['calf', 'wade'], ['leg', 'bein'], ['arm', 'arm'],
+  ['rope', 'seil'], ['walk', 'gehen'], ['run', 'laufen'], ['cycling', 'radfahren'], ['goblet', 'goblet'], ['sumo', 'sumo'], ['hammer', 'hammer'], ['preacher', 'scott'],
+];
 
 const Exercises = {
   _cache: null,
@@ -96,18 +119,21 @@ const Exercises = {
     const versionRow = await DB.get('settings', 'exerciseSeedVersion');
     const currentVersion = versionRow ? versionRow.value : 0;
 
-    if (currentVersion < EXERCISE_SEED_VERSION) {
-      const existing = await DB.getAll('exercises');
+    let existing = await DB.getAll('exercises');
+    // Selbstheilung: fehlen die mitgelieferten Übungen (z. B. neue Installation, Merker stammte von einem anderen Gerät),
+    // wird trotz gesetzter Version neu eingespielt.
+    const builtIn = existing.filter((e) => !e.custom).length;
+    const needsSeed = currentVersion < EXERCISE_SEED_VERSION || builtIn < EXERCISE_SEED.length * 0.5;
+
+    if (needsSeed) {
       const existingIds = new Set(existing.map((e) => e.id));
-      for (const ex of EXERCISE_SEED) {
-        if (!existingIds.has(ex.id)) await DB.put('exercises', ex);
-      }
+      const missing = EXERCISE_SEED.filter((ex) => !existingIds.has(ex.id));
+      if (missing.length) await DB.putMany('exercises', missing);
       await DB.put('settings', { key: 'exerciseSeedVersion', value: EXERCISE_SEED_VERSION });
-      this._cache = await DB.getAll('exercises');
-      return this._cache;
+      existing = await DB.getAll('exercises');
     }
 
-    this._cache = await DB.getAll('exercises');
+    this._cache = existing;
     return this._cache;
   },
 
@@ -121,6 +147,25 @@ const Exercises = {
   },
 
   invalidate() { this._cache = null; },
+
+  // Sucht in Name, deutschem Namen, Aliasen und den deutschen Schlüsselwörtern (einmal je Übung berechnet)
+  _sText: new WeakMap(),
+  searchText(e) {
+    let t = this._sText.get(e);
+    if (t == null) {
+      const name = (e.name || '').toLowerCase();
+      const de = EXERCISE_DE_TERMS.filter(([en]) => name.includes(en)).map(([, d]) => d).join(' ');
+      t = [name, (e.nameDe || '').toLowerCase(), (e.aliases || []).join(' ').toLowerCase(), de].join(' ');
+      this._sText.set(e, t);
+    }
+    return t;
+  },
+  // Alle Suchwörter müssen vorkommen („kurzhantel bank“ findet „Dumbbell Bench Press“)
+  matches(e, q) {
+    if (!q) return true;
+    const t = this.searchText(e);
+    return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => t.includes(w));
+  },
 
   async personalRecords(exerciseId) {
     const sessions = await DB.getAll('workoutSessions');
@@ -208,7 +253,7 @@ const ExercisesView = {
     const q = this.query.trim().toLowerCase();
     return all.filter((e) =>
       (this.muscle === 'all' || e.primaryMuscle === this.muscle) &&
-      (!q || e.name.toLowerCase().includes(q))
+      Exercises.matches(e, q)
     );
   },
 
@@ -216,10 +261,7 @@ const ExercisesView = {
     list.innerHTML = '';
     const items = this.filtered(all);
     if (items.length === 0) {
-      list.appendChild(App.el('div', { class: 'empty' }, [
-        App.el('div', { class: 'empty-icon', html: Icons.fitness() }),
-        'Keine Übungen gefunden.',
-      ]));
+      list.appendChild(App.emptyState({ icon: 'search', title: 'Keine Übungen gefunden', sub: 'Versuche einen anderen Suchbegriff oder lege eine eigene Übung an.' }));
       return;
     }
     const shown = items.slice(0, this.RENDER_LIMIT);
@@ -262,7 +304,8 @@ const ExercisesView = {
     }
 
     const content = App.el('div', {}, [
-      App.el('h3', {}, ex.name),
+      App.el('h3', { style: ex.nameDe ? 'margin-bottom:4px' : '' }, ex.name),
+      ex.nameDe && ex.nameDe.toLowerCase() !== ex.name.toLowerCase() ? App.el('div', { class: 'tag', style: 'margin-bottom:14px' }, `Deutsch: ${ex.nameDe}`) : null,
       mediaBox,
       App.el('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px;margin-bottom:14px' }, [
         App.el('span', { class: 'pill' }, ex.primaryMuscle),
@@ -277,6 +320,7 @@ const ExercisesView = {
             App.el('div', { class: 'field' }, [App.el('label', {}, 'Beschreibung'), App.el('div', {}, ex.description || '–')]),
             App.el('div', { class: 'field' }, [App.el('label', {}, 'Ausführung'), App.el('div', {}, ex.execution || '–')]),
           ]),
+      ex.source === 'wger' ? App.el('p', { class: 'tag', style: 'margin:0 0 14px' }, `Quelle: wger.de · Lizenz ${ex.licenseShort || 'CC-BY-SA'}${ex.licenseAuthor ? ' · Autor: ' + ex.licenseAuthor : ''}`) : null,
       App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Schließen'),
     ]);
     App.showModal(content);

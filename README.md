@@ -50,5 +50,6 @@ Tests (keine Abhängigkeiten): `npm test`
 ## Weiterführende Anleitungen
 
 - [`SYNC.md`](SYNC.md): Veröffentlichen auf GitHub Pages, Installation auf allen Geräten, Sync einrichten
+- [`NOTICE.md`](NOTICE.md): Quellen und Lizenzen der Übungsdatenbank
 - [`NATIVE.md`](NATIVE.md): iOS/Android-App mit Capacitor, native Erinnerungen, App-Blocking
 - [`supabase/schema.sql`](supabase/schema.sql): Datenbankschema für den Sync

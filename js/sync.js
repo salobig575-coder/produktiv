@@ -4,7 +4,8 @@
 const Sync = {
   STORES: ['tasks', 'notes', 'habits', 'habitLogs', 'focusSessions', 'settings', 'exercises', 'workouts', 'workoutSessions',
     'bodyMetrics', 'goals', 'cardioSessions', 'stepLogs', 'sleepLogs', 'gyms', 'events'], // Fotos (Blobs) bleiben lokal
-  LOCAL_SETTINGS: ['aiKey', 'syncSession', 'syncUrl', 'syncKey', 'syncCursor'],
+  // Gerätespezifisch: Schlüssel, Anmeldung und der Merker, ob die mitgelieferten Übungen schon eingespielt wurden
+  LOCAL_SETTINGS: ['aiKey', 'syncSession', 'syncUrl', 'syncKey', 'syncCursor', 'exerciseSeedVersion'],
   status: 'aus',
   enabled: false, // erst nach Anmeldung wird mitgeschrieben (spart Arbeit; die Anmeldung markiert alles)
   _timer: null,
@@ -151,6 +152,7 @@ const Sync = {
       const rows = await res.json();
       for (const r of rows) {
         if (!this.STORES.includes(r.store)) continue;
+        if (r.store === 'settings' && this.LOCAL_SETTINGS.includes(r.id)) continue; // fremde Geräte-Merker nie übernehmen
         const k = `${r.store}\u0001${r.id}`;
         if (dirty[k] && dirty[k].t >= r.client_ts) continue; // lokale Änderung ist neuer
         const local = await DB.get(r.store, r.id);

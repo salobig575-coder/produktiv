@@ -222,7 +222,7 @@ const WorkoutSessionView = {
       listBox.innerHTML = '';
       const all = await Exercises.all();
       const q = query.trim().toLowerCase();
-      const items = all.filter((ex) => (muscle === 'all' || ex.primaryMuscle === muscle) && (!q || ex.name.toLowerCase().includes(q)));
+      const items = all.filter((ex) => (muscle === 'all' || ex.primaryMuscle === muscle) && Exercises.matches(ex, q));
       const LIMIT = 60;
       for (const ex of items.slice(0, LIMIT)) {
         const thumb = ex.images && ex.images[0]

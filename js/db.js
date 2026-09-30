@@ -150,6 +150,19 @@ const DB = {
     });
   },
 
+  // Viele Datensätze in einer einzigen Transaktion (deutlich schneller, z. B. beim Einspielen der Übungs-Datenbank)
+  async putMany(storeName, items) {
+    const db = await dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      for (const item of items) store.put(item);
+      tx.oncomplete = () => resolve(items.length);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  },
+
   async delete(storeName, id) {
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
