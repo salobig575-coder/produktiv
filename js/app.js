@@ -16,6 +16,8 @@ const App = {
       btn.addEventListener('click', () => this.navigate(route));
     });
     document.getElementById('settingsBtn').addEventListener('click', () => SettingsView.open());
+    document.getElementById('searchBtn').innerHTML = Icons.search();
+    document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
 
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });

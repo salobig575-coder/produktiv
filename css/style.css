@@ -187,7 +187,7 @@ header.topbar .sub {
   margin-top: 2px;
 }
 
-#settingsBtn {
+#settingsBtn, #searchBtn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -201,6 +201,8 @@ header.topbar .sub {
   transition: transform .35s var(--ease-spring), color .2s;
 }
 #settingsBtn:active { transform: scale(.9) rotate(25deg); }
+#searchBtn:active { transform: scale(.9); }
+.topbar-actions { display: flex; gap: 8px; }
 #settingsBtn svg { width: 19px; height: 19px; }
 
 main {
@@ -1092,3 +1094,8 @@ a { color: var(--accent); }
 }
 .toast { display: flex; align-items: center; gap: 14px; }
 .toast-action { background: none; border: none; color: var(--accent-2); font-weight: 800; font-size: 14px; padding: 0; cursor: pointer; }
+
+/* ---------- Planer: Wochen-Drag ---------- */
+.week-day.drop { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.week-item { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.week-item.dragging-week { position: relative; z-index: 20; touch-action: none; background: var(--surface); border-radius: 8px; padding: 2px 6px; box-shadow: var(--shadow-lg); }

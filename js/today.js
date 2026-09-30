@@ -21,6 +21,8 @@ const TodayView = {
       ]));
     }
 
+    if (typeof Planner !== 'undefined') wrap.appendChild(await this.nowCard(today));
+
     const dateLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
     wrap.appendChild(App.el('div', { class: 'card hero' }, [
       App.el('h2', {}, 'Übersicht'),
@@ -165,5 +167,76 @@ const TodayView = {
     }
 
     return wrap;
+  },
+  // „Was jetzt?“: aktueller Block, sonst der nächste – mit passender Aktion oder einem Vorschlag für freie Zeit.
+  async nowCard(today) {
+    const data = await Planner.load();
+    const now = Planner.nowMin();
+    const items = Planner.dayItems(today, data);
+    const current = items.find((i) => !i.done && i.start <= now && now < i.end);
+    const next = items.find((i) => !i.done && i.start > now);
+    const card = App.el('div', { class: 'card', style: 'border-color:var(--accent)' }, [
+      App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Jetzt']),
+    ]);
+    const goFocus = (opts) => {
+      if (!FocusView.prepare(opts)) { Planner.toast('Es läuft bereits ein Fokus.'); return; }
+      PlanenHub.activeTab = 'focus';
+      App.navigate('planen');
+    };
+    const btn = (label, fn, secondary) => App.el('button', { class: 'btn' + (secondary ? ' secondary' : ''), style: 'flex:1;margin:0', onclick: fn }, label);
+    const actions = (nodes) => card.appendChild(App.el('div', { class: 'row', style: 'margin-top:12px' }, nodes));
+
+    if (current) {
+      const pct = Math.round(((now - current.start) / (current.end - current.start)) * 100);
+      card.appendChild(App.el('div', { style: 'font-size:19px;font-weight:800' }, current.title));
+      card.appendChild(App.el('div', { class: 'tag', style: 'margin:2px 0 10px' }, `${Planner.fmt(current.start)}–${Planner.fmt(current.end)} · noch ${Planner.fmtDur(current.end - now)}`));
+      card.appendChild(App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill', style: `width:${pct}%` })]));
+      if (current.type === 'task') {
+        actions([
+          btn('Erledigt', async () => { current.ref.done = true; current.ref.updatedAt = Date.now(); await DB.put('tasks', current.ref); await Planner.spawnNext(current.ref); App.refresh(); }, true),
+          btn('Fokus starten', () => goFocus({ minutes: Math.min(current.end - now, 120), intention: current.title, taskId: current.id })),
+        ]);
+      } else if (current.type === 'habit') {
+        actions([btn('Abhaken', async () => { await HabitsView.toggleLog(current.id, today); })]);
+      } else if (current.kind === 'focus') {
+        actions([btn('Fokus starten', () => goFocus({ minutes: Math.min(current.end - now, 180), level: current.ref.level || 'normal', intention: current.title }))]);
+      }
+    } else {
+      const gap = (next ? next.start : data.s.end) - now;
+      const rank = { high: 0, normal: 1, low: 2 };
+      const pick = Planner.inbox(data.tasks)
+        .filter((t) => (t.duration || 30) <= gap)
+        .sort((a, b) =>
+          ((a.dueDate && a.dueDate <= today) ? 0 : 1) - ((b.dueDate && b.dueDate <= today) ? 0 : 1) ||
+          rank[a.priority || 'normal'] - rank[b.priority || 'normal'] ||
+          (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))[0];
+      if (next) {
+        card.appendChild(App.el('div', { class: 'tag' }, `Als Nächstes in ${Planner.fmtDur(next.start - now)}`));
+        card.appendChild(App.el('div', { style: 'font-size:19px;font-weight:800;margin:2px 0' }, next.title));
+        card.appendChild(App.el('div', { class: 'tag' }, `${Planner.fmt(next.start)}–${Planner.fmt(next.end)}`));
+      } else if (items.length || data.tasks.some((t) => t.done)) {
+        card.appendChild(App.el('div', { style: 'font-size:17px;font-weight:800' }, now >= data.s.end ? 'Feierabend 🎉' : 'Für heute ist alles Geplante erledigt 🎉'));
+      } else {
+        card.appendChild(App.el('div', { class: 'tag' }, 'Noch nichts geplant.'));
+      }
+      if (pick) {
+        const dur = pick.duration || 30;
+        card.appendChild(App.el('div', { style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border)' }, [
+          App.el('div', { class: 'tag' }, `Freie Zeit: ${Planner.fmtDur(gap)} – Vorschlag`),
+          App.el('div', { class: 'item-title', style: 'margin-top:2px' }, pick.title),
+        ]));
+        actions([btn(`Jetzt starten (${Planner.fmtDur(dur)})`, async () => {
+          pick.planDate = today;
+          pick.planStart = Math.floor(now / 5) * 5;
+          pick.duration = dur;
+          pick.updatedAt = Date.now();
+          await DB.put('tasks', pick);
+          goFocus({ minutes: dur, intention: pick.title, taskId: pick.id });
+        })]);
+      } else if (!next && !items.length) {
+        actions([btn('Zum Kalender', () => { PlanenHub.activeTab = 'calendar'; CalendarView.selectedDate = today; App.navigate('planen'); }, true)]);
+      }
+    }
+    return card;
   },
 };

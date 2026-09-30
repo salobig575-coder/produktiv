@@ -44,6 +44,7 @@ const TasksView = {
             t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
             t.planStart != null && !t.done ? App.el('span', { class: 'pill active' }, `${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)}`) : null,
             t.duration ? App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration)) : null,
+            t.subtasks && t.subtasks.length ? App.el('span', { class: 'pill' }, `${t.subtasks.filter((x) => x.done).length}/${t.subtasks.length} Schritte`) : null,
             t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
           ]),
         ]),
@@ -84,6 +85,26 @@ const TasksView = {
   openEditor(task) {
     const isNew = !task;
     const t = task ? { ...task } : { id: DB.uid(), title: '', dueDate: '', priority: 'normal', notes: '', done: false, createdAt: Date.now() };
+    t.subtasks = (t.subtasks || []).map((st) => ({ ...st }));
+    const subsBox = App.el('div', { class: 'list', style: 'margin-bottom:8px' });
+    const drawSubs = () => {
+      subsBox.innerHTML = '';
+      t.subtasks.forEach((st) => subsBox.appendChild(App.el('div', { class: 'item' + (st.done ? ' done' : ''), style: 'padding:8px 12px;animation:none' }, [
+        App.el('button', { class: 'checkbox' + (st.done ? ' checked' : ''), html: Icons.check(), onclick: () => { st.done = !st.done; drawSubs(); } }),
+        App.el('div', { class: 'item-title', style: 'flex:1;min-width:0' }, st.title),
+        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { t.subtasks = t.subtasks.filter((x) => x.id !== st.id); drawSubs(); } }),
+      ])));
+    };
+    const subInput = App.el('input', { type: 'text', placeholder: 'Unteraufgabe hinzufügen …', enterkeyhint: 'done' });
+    const addSub = () => {
+      const v = subInput.value.trim();
+      if (!v) return;
+      t.subtasks.push({ id: DB.uid(), title: v, done: false });
+      subInput.value = '';
+      drawSubs();
+    };
+    subInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addSub(); } });
+    drawSubs();
 
     const titleInput = App.el('input', { type: 'text', value: t.title, placeholder: 'Was ist zu tun?' });
     const dueInput = App.el('input', { type: 'date', value: t.dueDate || '' });
@@ -119,6 +140,14 @@ const TasksView = {
       } }, [App.el('span', { html: Icons.focus(), style: 'width:16px;height:16px' }), 'Fokus dazu starten']) : null,
       !isNew ? App.el('button', { class: 'btn secondary', style: 'margin-bottom:12px', onclick: (e) => this.aiBreakdown(t, e.currentTarget) }, [App.el('span', { html: Icons.sparkles(), style: 'width:16px;height:16px' }), 'Mit KI in Schritte zerlegen']) : null,
       t.actual ? App.el('p', { class: 'tag', style: 'margin:0 0 12px' }, `Tatsächlich ${Planner.fmtDur(t.actual)} gearbeitet${t.duration ? ` (geplant ${Planner.fmtDur(t.duration)})` : ''}.`) : null,
+      App.el('div', { class: 'field' }, [
+        App.el('label', {}, 'Unteraufgaben'),
+        subsBox,
+        App.el('div', { class: 'row' }, [
+          App.el('div', { style: 'flex:1' }, [subInput]),
+          App.el('button', { class: 'icon-btn', style: 'color:var(--accent)', html: Icons.plus(), onclick: addSub }),
+        ]),
+      ]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Notizen'), notesInput]),
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),
@@ -130,6 +159,7 @@ const TasksView = {
             t.priority = prioSelect.value;
             t.duration = durSelect.value ? Number(durSelect.value) : null;
             t.repeat = repeatSelect.value;
+            addSub();
             t.notes = notesInput.value;
             t.updatedAt = Date.now();
             await DB.put('tasks', t);
@@ -159,7 +189,15 @@ const TasksView = {
         App.el('div', { class: 'tag', style: 'margin-bottom:14px' }, t.title),
         App.el('div', { class: 'list', style: 'margin-bottom:14px' }, rows),
         App.el('div', { class: 'row' }, [
-          App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Verwerfen'),
+          App.el('button', { class: 'btn secondary', onclick: async () => {
+            const cur = (await DB.get('tasks', t.id)) || t;
+            cur.subtasks = [...(cur.subtasks || []), ...steps.map((st) => ({ id: DB.uid(), title: `${st.title} (${st.minutes} min)`, done: false }))];
+            cur.updatedAt = Date.now();
+            await DB.put('tasks', cur);
+            App.closeModal();
+            App.refresh();
+            Planner.toast('Als Unteraufgaben gespeichert.');
+          } }, 'Als Unteraufgaben'),
           App.el('button', { class: 'btn', onclick: async () => {
             for (const st of steps) {
               await DB.put('tasks', { id: DB.uid(), title: st.title, dueDate: t.dueDate || '', priority: t.priority || 'normal', notes: `Schritt zu: ${t.title}`, done: false, duration: st.minutes, repeat: 'none', createdAt: Date.now(), updatedAt: Date.now() });
@@ -167,7 +205,7 @@ const TasksView = {
             App.closeModal();
             App.refresh();
             Planner.toast(`${steps.length} Schritte in der Inbox.`);
-          } }, 'Als Aufgaben anlegen'),
+          } }, 'Als Aufgaben'),
         ]),
       ])), 230);
     } catch (e) {

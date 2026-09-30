@@ -276,6 +276,57 @@ const CalendarView = {
     return card;
   },
 
+  // ---------- Wochenansicht: Block auf anderen Tag ziehen ----------
+  makeWeekDraggable(row, it, fromDate) {
+    if (it.type === 'habit') return;
+    let timer = null, drag = false, x0 = 0, y0 = 0, target = null, active = false;
+    const clear = () => document.querySelectorAll('.week-day.drop').forEach((c) => c.classList.remove('drop'));
+    const activate = () => { drag = true; row.classList.add('dragging-week'); if (navigator.vibrate) navigator.vibrate(12); };
+    row.addEventListener('pointerdown', (e) => {
+      x0 = e.clientX; y0 = e.clientY; drag = false; active = true; target = null;
+      row.setPointerCapture(e.pointerId);
+      if (e.pointerType !== 'mouse') timer = setTimeout(activate, 350);
+    });
+    row.addEventListener('pointermove', (e) => {
+      if (!active) return;
+      if (!drag) {
+        if (Math.hypot(e.clientX - x0, e.clientY - y0) <= 8) return;
+        if (e.pointerType === 'mouse') activate();
+        else { clearTimeout(timer); active = false; return; }
+      }
+      row.style.transform = `translate(${e.clientX - x0}px, ${e.clientY - y0}px)`;
+      clear();
+      const hit = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList && el.classList.contains('week-day'));
+      target = hit ? hit.dataset.date : null;
+      if (hit && target !== fromDate) hit.classList.add('drop');
+    });
+    const end = async (commit) => {
+      clearTimeout(timer);
+      if (!active) return;
+      active = false;
+      clear();
+      row.style.transform = '';
+      row.classList.remove('dragging-week');
+      if (!drag) return;
+      row._suppress = true;
+      if (!commit || !target || target === fromDate) return;
+      if (it.type === 'event') {
+        if ((it.ref.repeat || 'none') !== 'none') { Planner.toast('Serientermine bitte im Editor verschieben.'); return; }
+        it.ref.date = target;
+        await DB.put('events', it.ref);
+      } else {
+        it.ref.planDate = target;
+        it.ref.updatedAt = Date.now();
+        await DB.put('tasks', it.ref);
+      }
+      App.refresh();
+    };
+    row.addEventListener('pointerup', () => end(true));
+    row.addEventListener('pointercancel', () => end(false));
+    row.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+    row.addEventListener('click', (e) => { if (row._suppress) { e.stopPropagation(); e.preventDefault(); row._suppress = false; } }, true);
+  },
+
   // ---------- Verschieben & Größe ändern ----------
   // Langes Drücken (bzw. Ziehen mit der Maus) verschiebt in 15-Minuten-Schritten, der untere Griff ändert die Dauer.
   makeDraggable(block, it, PX) {
@@ -474,6 +525,7 @@ const CalendarView = {
       const isToday = ds === this.today();
       const card = App.el('div', {
         class: 'card week-day' + (isToday ? ' today' : ''),
+        'data-date': ds,
         style: 'cursor:pointer;padding:12px 14px',
         onclick: () => { this.selectedDate = ds; this.mode = 'day'; this._scrolled = false; App.refresh(); },
       }, [
@@ -485,10 +537,14 @@ const CalendarView = {
       ]);
       if (items.length) {
         const list = App.el('div', { style: 'margin-top:10px;display:flex;flex-direction:column;gap:4px' });
-        items.slice(0, 4).forEach((it) => list.appendChild(App.el('div', { class: 'week-item' + (it.done ? ' done' : '') }, [
-          App.el('span', { class: 'week-time' }, Planner.fmt(it.start)),
-          App.el('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.title),
-        ])));
+        items.slice(0, 4).forEach((it) => {
+          const row = App.el('div', { class: 'week-item' + (it.done ? ' done' : '') }, [
+            App.el('span', { class: 'week-time' }, Planner.fmt(it.start)),
+            App.el('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.title),
+          ]);
+          this.makeWeekDraggable(row, it, ds);
+          list.appendChild(row);
+        });
         if (items.length > 4) list.appendChild(App.el('div', { class: 'tag' }, `+ ${items.length - 4} weitere`));
         card.appendChild(list);
       }
