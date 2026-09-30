@@ -8,8 +8,10 @@
 <meta name="description" content="Produktivität und Fitness an einem Ort: Aufgaben, Notizen, Fokus-Timer, Habits, Workouts und Kalorienrechner.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Produktiv">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="css/style.css">
 <script>
@@ -57,6 +59,7 @@
 <script src="js/icons.js"></script>
 <script src="js/db.js"></script>
 <script src="js/calc.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 <script src="js/today.js"></script>
 <script src="js/planner.js"></script>
@@ -79,6 +82,7 @@
 <script src="js/hubs.js"></script>
 <script src="js/settings.js"></script>
 <script>
+  Sync.install();
   App.init();
 </script>
 </body>

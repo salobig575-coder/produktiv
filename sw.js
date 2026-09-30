@@ -1,4 +1,4 @@
-const CACHE_NAME = 'produktiv-v22';
+const CACHE_NAME = 'produktiv-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/icons.js',
   './js/db.js',
   './js/calc.js',
+  './js/sync.js',
   './js/app.js',
   './js/today.js',
   './js/planner.js',
@@ -29,6 +30,9 @@ const ASSETS = [
   './js/hubs.js',
   './js/settings.js',
   './icons/icon.svg',
+  './icons/icon-180.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -47,6 +51,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Nur eigene Dateien und Schriften cachen – Sync- und KI-Anfragen gehen immer direkt ins Netz.
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin && !/^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request).then((res) => {

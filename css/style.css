@@ -394,7 +394,7 @@ main {
 }
 .btn.danger { background: linear-gradient(135deg, #ff6b6b, var(--danger)); box-shadow: 0 10px 24px -10px rgba(229,72,77,.6); }
 
-input[type="text"], input[type="date"], input[type="number"], textarea, select {
+input[type="text"], input[type="date"], input[type="number"], input[type="time"], input[type="email"], input[type="password"], input[type="url"], textarea, select {
   width: 100%;
   background: var(--surface-2);
   border: 1px solid transparent;

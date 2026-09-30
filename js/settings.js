@@ -62,6 +62,43 @@ const SettingsView = {
     const endpointInput = App.el('input', { type: 'url', value: ai.endpoint, placeholder: 'Optional: eigener Proxy (statt api.anthropic.com)' });
     endpointInput.addEventListener('change', async () => { await DB.put('settings', { key: 'aiEndpoint', value: endpointInput.value.trim() }); });
 
+    const sc = await Sync.cfg();
+    const urlInput = App.el('input', { type: 'url', value: sc.url, placeholder: 'https://xxxx.supabase.co', autocapitalize: 'off' });
+    const skeyInput = App.el('input', { type: 'password', value: sc.key, placeholder: 'anon public key', autocomplete: 'off' });
+    const mailInput = App.el('input', { type: 'email', value: sc.session ? sc.session.email : '', placeholder: 'E-Mail', autocomplete: 'email' });
+    const passInput = App.el('input', { type: 'password', placeholder: 'Passwort (mind. 6 Zeichen)', autocomplete: 'current-password' });
+    const syncMsg = App.el('div', { class: 'tag', style: 'margin:8px 0 10px' }, Sync.statusText());
+    const saveCfg = async () => { await Sync.setLocal('syncUrl', urlInput.value.trim()); await Sync.setLocal('syncKey', skeyInput.value.trim()); };
+    const doAuth = (kind) => async () => {
+      syncMsg.textContent = 'Einen Moment …';
+      try {
+        await saveCfg();
+        await Sync.auth(kind, mailInput.value.trim(), passInput.value);
+        await Sync.run();
+        this.open();
+      } catch (e) { syncMsg.textContent = e.message; }
+    };
+    const syncCard = App.el('div', { class: 'card' }, [
+      App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'Geräte-Sync']),
+      App.el('p', { class: 'tag' }, 'Hält Mac, PC und iPhone synchron (Supabase). Einrichtung: siehe SYNC.md. Die Daten bleiben zusätzlich lokal auf jedem Gerät.'),
+    ]);
+    if (sc.session) {
+      syncCard.appendChild(App.el('div', { class: 'tag', style: 'margin-bottom:4px' }, `Angemeldet als ${sc.session.email}`));
+      syncCard.appendChild(syncMsg);
+      syncCard.appendChild(App.el('button', { class: 'btn', style: 'margin-bottom:8px', onclick: async () => { syncMsg.textContent = 'Synchronisiere …'; await Sync.run(); syncMsg.textContent = Sync.statusText(); } }, 'Jetzt synchronisieren'));
+      syncCard.appendChild(App.el('button', { class: 'btn secondary', style: 'margin-bottom:0', onclick: async () => { await Sync.logout(); this.open(); } }, 'Abmelden'));
+    } else {
+      syncCard.appendChild(App.el('div', { class: 'field' }, [App.el('label', {}, 'Projekt-URL'), urlInput]));
+      syncCard.appendChild(App.el('div', { class: 'field' }, [App.el('label', {}, 'Anon Key'), skeyInput]));
+      syncCard.appendChild(App.el('div', { class: 'field' }, [App.el('label', {}, 'Konto'), mailInput]));
+      syncCard.appendChild(App.el('div', { class: 'field', style: 'margin-bottom:0' }, [passInput]));
+      syncCard.appendChild(syncMsg);
+      syncCard.appendChild(App.el('div', { class: 'row' }, [
+        App.el('button', { class: 'btn secondary', onclick: doAuth('signup') }, 'Registrieren'),
+        App.el('button', { class: 'btn', onclick: doAuth('login') }, 'Anmelden'),
+      ]));
+    }
+
     const icsInput = App.el('input', { type: 'file', accept: '.ics,text/calendar', style: 'display:none' });
     icsInput.addEventListener('change', () => this.importICS(icsInput.files[0]));
 
@@ -88,6 +125,7 @@ const SettingsView = {
           if (val && 'Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
         }),
       ]),
+      syncCard,
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'KI (optional)']),
         App.el('p', { class: 'tag' }, 'Aufgaben in Schritte zerlegen und Wochenfazit. Der Schlüssel bleibt nur auf diesem Gerät; Anfragen gehen direkt an Anthropic. Ohne Schlüssel funktioniert alles andere wie gewohnt.'),
