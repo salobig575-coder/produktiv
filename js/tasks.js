@@ -111,6 +111,12 @@ const TasksView = {
         t.planDate = null; t.planStart = null; t.updatedAt = Date.now();
         await DB.put('tasks', t); App.closeModal(); App.refresh();
       } }, `Aus Plan nehmen (${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)})`) : null,
+      !isNew ? App.el('button', { class: 'btn secondary', style: 'margin-bottom:12px', onclick: () => {
+        if (FocusView.prepare({ minutes: Math.min(t.duration || 25, 120), intention: t.title, taskId: t.id })) {
+          PlanenHub.activeTab = 'focus'; App.closeModal(); App.navigate('planen');
+        } else Planner.toast('Es läuft bereits ein Fokus.');
+      } }, [App.el('span', { html: Icons.focus(), style: 'width:16px;height:16px' }), 'Fokus dazu starten']) : null,
+      t.actual ? App.el('p', { class: 'tag', style: 'margin:0 0 12px' }, `Tatsächlich ${Planner.fmtDur(t.actual)} gearbeitet${t.duration ? ` (geplant ${Planner.fmtDur(t.duration)})` : ''}.`) : null,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Notizen'), notesInput]),
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),

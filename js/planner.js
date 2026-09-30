@@ -83,8 +83,11 @@ const Planner = {
 
   // ---------- Tagesdaten ----------
   async load() {
-    const [events, tasks] = await Promise.all([DB.getAll('events'), DB.getAll('tasks')]);
-    return { events, tasks };
+    const [events, tasks, habits, logs, sleepLogs, st] = await Promise.all([
+      DB.getAll('events'), DB.getAll('tasks'), DB.getAll('habits'), DB.getAll('habitLogs'), DB.getAll('sleepLogs'), this.settings(),
+    ]);
+    const sleep = sleepLogs.find((l) => l.date === App.todayStr());
+    return { events, tasks, habits, logs, s: st, sleep: sleep ? sleep.hours : null };
   },
 
   dayItems(date, data) {
@@ -96,8 +99,27 @@ const Planner = {
       const dur = t.duration || 30;
       items.push({ type: 'task', kind: 'task', id: t.id, ref: t, title: t.title, start: t.planStart, dur, end: Math.min(t.planStart + dur, 1440), done: t.done, priority: t.priority });
     });
+    this.placeHabits(date, data, items);
     items.sort((a, b) => a.start - b.start || a.end - b.end);
     return items;
+  },
+
+  // Routinen mit Zeitfenster werden bei jedem Aufruf neu um feste Blöcke herum platziert (nichts wird gespeichert).
+  placeHabits(date, data, items) {
+    if (!data.habits) return;
+    const weekday = new Date(date + 'T00:00:00').getDay();
+    const due = data.habits
+      .filter((h) => h.window && (!h.days || h.days.length === 0 || h.days.includes(weekday)))
+      .sort((a, b) => a.window.from - b.window.from);
+    for (const h of due) {
+      const dur = h.dur || 30;
+      const done = data.logs.some((l) => l.habitId === h.id && l.date === date);
+      const s = { ...data.s, start: h.window.from, end: h.window.to };
+      const fit = (d) => this.freeSlots(items, s, d).find((g) => g[1] - g[0] >= dur);
+      const gap = (done ? fit('x') : (fit(date) || fit('x')));
+      if (!gap) continue;
+      items.push({ type: 'habit', kind: 'habit', id: h.id, ref: h, title: h.name, start: gap[0], dur, end: gap[0] + dur, done });
+    }
   },
 
   loadMinutes(items) {
@@ -138,12 +160,30 @@ const Planner = {
 
   // Schlägt eine Verteilung der Inbox auf freie Zeit vor. Schreibt nichts.
   // Reihenfolge: Fälligkeit/Überfällig -> Priorität -> Deadline -> Alter. Der Tag wird nur zu ~85 % gefüllt.
+  // Median aus Ist/Soll der erledigten Aufgaben mit Fokus-Zeit; erst ab 3 Datenpunkten.
+  estimateFactor(tasks) {
+    const r = tasks.filter((t) => t.done && t.actual > 0 && t.duration).map((t) => t.actual / t.duration).sort((a, b) => a - b);
+    if (r.length < 3) return 1;
+    const med = r[Math.floor(r.length / 2)];
+    return Math.round(Math.min(2, Math.max(0.7, med)) * 20) / 20;
+  },
+
   async suggest(date) {
-    const s = await this.settings();
     const data = await this.load();
+    const s = data.s;
     const items = this.dayItems(date, data);
+    const notes = [];
     const rank = { high: 0, normal: 1, low: 2 };
     const horizon = this.addDays(date, 7);
+    const factor = this.estimateFactor(data.tasks);
+    const adj = (t) => {
+      const d = t.duration || 30;
+      return Math.abs(factor - 1) > 0.15 ? Math.ceil((d * factor) / 5) * 5 : d;
+    };
+    if (Math.abs(factor - 1) > 0.15) notes.push(`Deine Schätzungen liegen im Schnitt ${factor > 1 ? Math.round((factor - 1) * 100) + ' % zu kurz' : Math.round((1 - factor) * 100) + ' % zu lang'} – Dauer angepasst.`);
+    let fill = 0.85;
+    if (date === App.todayStr() && data.sleep != null && data.sleep < 6) { fill = 0.6; notes.push(`Nur ${data.sleep} h Schlaf – heute wird etwas weniger eingeplant.`); }
+
     const candidates = this.inbox(data.tasks)
       .filter((t) => t.priority === 'high' || !t.dueDate || t.dueDate <= horizon)
       .sort((a, b) =>
@@ -153,18 +193,23 @@ const Planner = {
         (a.createdAt || 0) - (b.createdAt || 0));
 
     const gaps = this.freeSlots(items, s, date);
-    const capacity = Math.max(0, Math.round((s.end - s.start) * 0.85) - this.loadMinutes(items));
+    const capacity = Math.max(0, Math.round((s.end - s.start) * fill) - this.loadMinutes(items));
     let used = 0;
     const placed = [], unplaced = [];
     for (const t of candidates) {
-      const dur = t.duration || 30;
-      const gap = used + dur <= capacity ? gaps.find((g) => g[1] - g[0] >= dur) : null;
+      const dur = adj(t);
+      let gap = null;
+      if (used + dur <= capacity) {
+        // Längere Aufgaben (Tiefenarbeit) bevorzugt vormittags
+        if (dur >= 60) gap = gaps.find((g) => g[0] < 720 && g[1] - g[0] >= dur);
+        if (!gap) gap = gaps.find((g) => g[1] - g[0] >= dur);
+      }
       if (!gap) { unplaced.push(t); continue; }
       placed.push({ task: t, start: gap[0], dur });
       gap[0] += dur + s.buffer;
       used += dur;
     }
-    return { date, placed, unplaced };
+    return { date, placed, unplaced, notes };
   },
 
   async apply(plan) {
@@ -188,8 +233,8 @@ const Planner = {
 
   // Einzelne Aufgabe in den ersten passenden freien Slot legen.
   async scheduleTask(task, date) {
-    const s = await this.settings();
     const data = await this.load();
+    const s = data.s;
     const items = this.dayItems(date, data);
     const dur = task.duration || 30;
     const gap = this.freeSlots(items, s, date).find((g) => g[1] - g[0] >= dur);
@@ -314,5 +359,78 @@ const Planner = {
     document.body.appendChild(t);
     setTimeout(() => t.classList.add('hide'), 4200);
     setTimeout(() => t.remove(), 4700);
+  },
+  // ---------- ICS Export / Import ----------
+  ICS_DAYS: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'],
+
+  icsStamp(date, min) {
+    return `${date.replace(/-/g, '')}T${String(Math.floor(min / 60) % 24).padStart(2, '0')}${String(min % 60).padStart(2, '0')}00`;
+  },
+  icsEscape(t) { return String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n'); },
+
+  toICS(data) {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Produktiv//Planen//DE', 'CALSCALE:GREGORIAN'];
+    const add = (uid, title, date, start, dur, rrule, skips) => {
+      lines.push('BEGIN:VEVENT', `UID:${uid}@produktiv`, `DTSTAMP:${this.icsStamp(App.todayStr(), 0)}`,
+        `DTSTART:${this.icsStamp(date, start)}`, `DTEND:${this.icsStamp(date, Math.min(start + dur, 1439))}`, `SUMMARY:${this.icsEscape(title)}`);
+      if (rrule) lines.push(`RRULE:${rrule}`);
+      (skips || []).forEach((d) => lines.push(`EXDATE:${this.icsStamp(d, start)}`));
+      lines.push('END:VEVENT');
+    };
+    const rr = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
+    data.events.forEach((e) => add(e.id, e.title, e.date, e.start, e.dur, rr[e.repeat], e.skip));
+    data.tasks.filter((t) => t.planStart != null && t.planDate && !t.done).forEach((t) => add(t.id, t.title, t.planDate, t.planStart, t.duration || 30));
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n');
+  },
+
+  // Liest einfache VEVENTs (Zeit-Termine, DAILY/WEEKLY/MONTHLY). Ganztägige Termine werden übersprungen.
+  parseICS(text) {
+    const raw = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+    const events = [];
+    let skipped = 0, cur = null;
+    const parseDT = (line) => {
+      const m = line.match(/^[^:]*:(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);
+      if (!m || m[4] == null) return null;
+      const d = m[7] ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])) : new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+      return d;
+    };
+    const unescape = (t) => t.replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1');
+    for (const line of raw) {
+      if (line === 'BEGIN:VEVENT') { cur = { skip: [] }; continue; }
+      if (line === 'END:VEVENT' && cur) {
+        if (cur.start && cur.title) {
+          const dur = cur.end ? Math.round((cur.end - cur.start) / 60000) : 60;
+          const startMin = cur.start.getHours() * 60 + cur.start.getMinutes();
+          events.push({
+            id: 'ics-' + (cur.uid || DB.uid()), title: cur.title, date: App.todayStr(cur.start), start: startMin,
+            dur: Math.max(15, Math.min(dur, 1440 - startMin)), kind: 'event', repeat: cur.repeat || 'none', remind: null,
+            skip: cur.skip.map((d) => App.todayStr(d)), createdAt: Date.now(),
+          });
+        } else skipped++;
+        cur = null; continue;
+      }
+      if (!cur) continue;
+      if (line.startsWith('UID')) cur.uid = line.split(':').slice(1).join(':').trim();
+      else if (line.startsWith('SUMMARY')) cur.title = unescape(line.split(':').slice(1).join(':')).trim();
+      else if (line.startsWith('DTSTART')) cur.start = parseDT(line);
+      else if (line.startsWith('DTEND')) cur.end = parseDT(line);
+      else if (line.startsWith('EXDATE')) { const d = parseDT(line); if (d) cur.skip.push(d); }
+      else if (line.startsWith('RRULE')) {
+        const f = (line.match(/FREQ=(\w+)/) || [])[1];
+        if (f === 'DAILY') cur.repeat = 'daily';
+        else if (f === 'MONTHLY') cur.repeat = 'monthly';
+        else if (f === 'WEEKLY') cur.repeat = /BYDAY=MO,TU,WE,TH,FR(?!,)/.test(line) ? 'weekdays' : 'weekly';
+      }
+    }
+    return { events, skipped };
+  },
+
+  // ---------- Tagesrituale (optional wegklickbar) ----------
+  ritualDismissed(key) {
+    try { return localStorage.getItem(`ritual:${key}:${App.todayStr()}`) === '1'; } catch (e) { return false; }
+  },
+  dismissRitual(key) {
+    try { localStorage.setItem(`ritual:${key}:${App.todayStr()}`, '1'); } catch (e) {}
   },
 };

@@ -1074,3 +1074,8 @@ a { color: var(--accent); }
   animation: popIn .35s var(--ease) both; transition: opacity .4s;
 }
 .toast.hide { opacity: 0; }
+
+/* ---------- Planer: Routinen-Blöcke ---------- */
+.tl-block.habit { background: transparent; border: 1.5px dashed var(--accent); border-left-width: 3px; border-left-style: solid; }
+.tl-block.habit.done { background: rgba(var(--accent-rgb), .08); }
+.btn[disabled] { opacity: .5; pointer-events: none; }

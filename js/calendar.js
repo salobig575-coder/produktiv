@@ -11,7 +11,7 @@ const CalendarView = {
     Planner.startReminders();
     const wrap = App.el('div');
     const data = await Planner.load();
-    const s = await Planner.settings();
+    const s = data.s;
 
     wrap.appendChild(this.renderHeader());
     wrap.appendChild(this.renderQuickAdd());
@@ -24,6 +24,7 @@ const CalendarView = {
     wrap.appendChild(this.renderDateStrip(data));
     const items = Planner.dayItems(this.selectedDate, data);
     this.renderMissed(wrap, data);
+    this.renderRituals(wrap, items, data);
     wrap.appendChild(this.renderSummary(items, s, data));
     wrap.appendChild(this.renderTimeline(items, s));
     wrap.appendChild(this.renderInbox(data));
@@ -236,11 +237,15 @@ const CalendarView = {
       const block = App.el('div', {
         class: cls,
         style: `top:${top(it.start)}px;height:${h}px;left:calc(${(it.col / it.cols) * 100}% + 2px);width:calc(${100 / it.cols}% - 4px)`,
-        onclick: (e) => { e.stopPropagation(); it.type === 'task' ? TasksView.openEditor(it.ref) : this.openEventEditor(it.ref); },
+        onclick: (e) => { e.stopPropagation(); it.type === 'task' ? TasksView.openEditor(it.ref) : it.type === 'habit' ? HabitsView.openEditor(it.ref) : this.openEventEditor(it.ref); },
       }, [
-        it.type === 'task' ? App.el('button', {
+        it.type !== 'event' ? App.el('button', {
           class: 'checkbox' + (it.done ? ' checked' : ''), html: Icons.check(),
-          onclick: async (e) => { e.stopPropagation(); await TasksView.toggleDone(it.ref, e.currentTarget); },
+          onclick: async (e) => {
+            e.stopPropagation();
+            if (it.type === 'task') await TasksView.toggleDone(it.ref, e.currentTarget);
+            else await HabitsView.toggleLog(it.id, this.selectedDate, e.currentTarget);
+          },
         }) : null,
         App.el('div', { class: 'tl-text' }, [
           App.el('div', { class: 'tl-title' }, it.title),
@@ -266,6 +271,52 @@ const CalendarView = {
       const anchor = nowLine || surface.querySelector('.tl-block');
       if (anchor) setTimeout(() => anchor.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
     }
+    return card;
+  },
+
+  // ---------- Morgen-Überblick / Tagesabschluss ----------
+  renderRituals(wrap, items, data) {
+    if (this.selectedDate !== this.today()) return;
+    const s = data.s, now = Planner.nowMin();
+    const open = items.filter((i) => !i.done && i.end > now);
+    const inbox = Planner.inbox(data.tasks);
+
+    if (now < 12 * 60 && !Planner.ritualDismissed('morning') && (items.length || inbox.length)) {
+      const first = open[0];
+      wrap.appendChild(this.ritualCard('morning', 'Guten Morgen', [
+        `${items.length} Blöcke heute${first ? `, der erste um ${Planner.fmt(first.start)}` : ''} · ${Planner.fmtDur(Planner.freeMinutes(items, s, this.today()))} frei.`,
+        data.sleep != null && data.sleep < 6 ? `Nur ${data.sleep} h Schlaf – geh es heute ruhiger an.` : null,
+      ], inbox.length ? { label: `Tag planen (${inbox.length})`, fn: async () => this.openSuggestion(await Planner.suggest(this.today())) } : null));
+    }
+
+    if (now >= Math.max(s.end - 60, 17 * 60) && !Planner.ritualDismissed('evening')) {
+      const doneCount = items.filter((i) => i.done).length;
+      const openItems = items.filter((i) => !i.done && i.type === 'task');
+      if (doneCount || openItems.length) {
+        wrap.appendChild(this.ritualCard('evening', 'Tagesabschluss', [
+          `${doneCount} erledigt · ${openItems.length} Aufgaben noch offen.`,
+        ], openItems.length ? { label: 'Auf morgen legen', fn: async () => {
+          for (const it of openItems) { it.ref.planDate = null; it.ref.planStart = null; await DB.put('tasks', it.ref); }
+          const tomorrow = Planner.addDays(this.today(), 1);
+          this.selectedDate = tomorrow;
+          this._scrolled = false;
+          this.openSuggestion(await Planner.suggest(tomorrow));
+        } } : null));
+      }
+    }
+  },
+
+  ritualCard(key, title, lines, action) {
+    const card = App.el('div', { class: 'card', style: 'padding:12px 14px' }, [
+      App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+        App.el('div', { style: 'flex:1;min-width:0' }, [
+          App.el('div', { style: 'font-weight:800;margin-bottom:2px' }, title),
+          ...lines.filter(Boolean).map((l) => App.el('div', { class: 'tag' }, l)),
+        ]),
+        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => { Planner.dismissRitual(key); card.remove(); } }),
+      ]),
+    ]);
+    if (action) card.appendChild(App.el('button', { class: 'btn', style: 'margin:10px 0 0', onclick: action.fn }, action.label));
     return card;
   },
 
@@ -326,6 +377,7 @@ const CalendarView = {
     } else {
       content.appendChild(App.el('div', { class: 'list', style: 'margin-bottom:12px' }, rows));
     }
+    (plan.notes || []).forEach((n) => content.appendChild(App.el('div', { class: 'tag', style: 'margin-bottom:8px' }, n)));
     if (plan.unplaced.length) {
       content.appendChild(App.el('div', { class: 'tag', style: 'margin-bottom:14px' }, `${plan.unplaced.length} bleiben in der Inbox. Der Tag wird bewusst nicht komplett gefüllt.`));
     }
@@ -403,6 +455,10 @@ const CalendarView = {
     kindSelect.value = e.kind || 'event';
     const repeatSelect = App.el('select', {}, Object.entries(Planner.REPEAT_LABEL).map(([k, l]) => App.el('option', { value: k }, l)));
     repeatSelect.value = e.repeat || 'none';
+    const levelSelect = App.el('select', {}, FocusView.LEVELS.map((l) => App.el('option', { value: l.key }, `${l.label} – ${l.desc}`)));
+    levelSelect.value = e.level || 'normal';
+    const levelField = App.el('div', { class: 'field', style: kindSelect.value === 'focus' ? '' : 'display:none' }, [App.el('label', {}, 'Härtegrad'), levelSelect]);
+    kindSelect.addEventListener('change', () => { levelField.style.display = kindSelect.value === 'focus' ? '' : 'none'; });
     const remindSelect = App.el('select', {}, [
       App.el('option', { value: '' }, 'Keine'), App.el('option', { value: '0' }, 'Zum Beginn'),
       App.el('option', { value: '10' }, '10 Minuten vorher'), App.el('option', { value: '30' }, '30 Minuten vorher'), App.el('option', { value: '60' }, '1 Stunde vorher'),
@@ -416,6 +472,7 @@ const CalendarView = {
       e.start = Planner.parseTime(timeInput.value);
       e.dur = Number(durSelect.value);
       e.kind = kindSelect.value;
+      e.level = levelSelect.value;
       e.repeat = repeatSelect.value;
       e.remind = remindSelect.value === '' ? null : Number(remindSelect.value);
       if (e.start + e.dur > 1440) e.dur = 1440 - e.start;
@@ -440,7 +497,7 @@ const CalendarView = {
       const extra = [];
       if (e.kind === 'focus') {
         extra.push(App.el('button', { class: 'btn secondary', style: 'margin-top:8px', onclick: () => {
-          if (!FocusView.state.running) { FocusView.state.focusMin = e.dur; FocusView.state.mode = 'focus'; FocusView.state.remaining = e.dur * 60; }
+          FocusView.prepare({ minutes: e.dur, level: e.level || 'normal', intention: e.title });
           PlanenHub.activeTab = 'focus';
           App.closeModal();
           App.navigate('planen');
@@ -455,6 +512,7 @@ const CalendarView = {
       App.el('h3', {}, isNew ? 'Neuer Termin' : 'Termin bearbeiten'),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Titel'), titleInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Art'), kindSelect]),
+      levelField,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Datum'), dateInput]),
       App.el('div', { class: 'row' }, [
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Beginn'), timeInput]),

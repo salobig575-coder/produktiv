@@ -53,6 +53,9 @@ const SettingsView = {
     bufferSelect.value = String(ps.buffer);
     bufferSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'plannerBuffer', value: Number(e.target.value) }); });
 
+    const icsInput = App.el('input', { type: 'file', accept: '.ics,text/calendar', style: 'display:none' });
+    icsInput.addEventListener('change', () => this.importICS(icsInput.files[0]));
+
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
       App.el('div', { class: 'card' }, [
@@ -74,6 +77,13 @@ const SettingsView = {
           await DB.put('settings', { key: 'remindersEnabled', value: val });
           if (val && 'Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
         }),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.planen(), style: 'width:14px;height:14px' }), 'Kalender-Austausch']),
+        App.el('p', { class: 'tag' }, 'Termine als .ics-Datei sichern oder aus Google, Apple oder Outlook übernehmen. Ganztägige Termine werden übersprungen.'),
+        App.el('button', { class: 'btn', style: 'margin-bottom:8px', onclick: () => this.exportICS() }, [App.el('span', { html: Icons.download(), style: 'width:16px;height:16px' }), 'Kalender exportieren (.ics)']),
+        App.el('button', { class: 'btn secondary', style: 'margin-bottom:0', onclick: () => icsInput.click() }, [App.el('span', { html: Icons.upload(), style: 'width:16px;height:16px' }), 'Kalender importieren (.ics)']),
+        icsInput,
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Training & Fortschritt']),
@@ -112,6 +122,31 @@ const SettingsView = {
       App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Schließen'),
     ]);
     App.showModal(content);
+  },
+
+  async exportICS() {
+    const blob = new Blob([Planner.toICS(await Planner.load())], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `produktiv-kalender-${App.todayStr()}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  async importICS(file) {
+    if (!file) return;
+    try {
+      const { events, skipped } = Planner.parseICS(await file.text());
+      for (const e of events) await DB.put('events', e);
+      App.closeModal();
+      App.refresh();
+      Planner.toast(`${events.length} Termine importiert${skipped ? `, ${skipped} übersprungen` : ''}.`);
+    } catch (e) {
+      alert('Kalender konnte nicht gelesen werden: ' + e.message);
+    }
   },
 
   async exportFile() {

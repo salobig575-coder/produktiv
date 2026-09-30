@@ -46,9 +46,9 @@ const HabitsView = {
       const streak = this.streak(logs, h.id);
       list.appendChild(App.el('div', { class: 'item' }, [
         App.el('span', { html: Icons.habits(), style: `width:20px;height:20px;flex-shrink:0;color:${streak > 0 ? 'var(--warn)' : 'var(--text-dim)'}` }),
-        App.el('div', { style: 'flex:1' }, [
+        App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(h) }, [
           App.el('div', { class: 'item-title' }, h.name),
-          App.el('div', { class: 'item-meta' }, streak > 0 ? `${streak} Tage in Folge` : 'Noch keine Serie'),
+          App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} Tage in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
         ]),
         App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
       ]));
@@ -111,15 +111,42 @@ const HabitsView = {
     const h = habit ? { ...habit } : { id: DB.uid(), name: '', createdAt: Date.now() };
     const nameInput = App.el('input', { type: 'text', value: h.name, placeholder: 'z.B. Lesen, Sport, Meditieren' });
 
+    const fromInput = App.el('input', { type: 'time', value: Planner.fmt(h.window ? h.window.from : 12 * 60) });
+    const toInput = App.el('input', { type: 'time', value: Planner.fmt(h.window ? h.window.to : 14 * 60) });
+    const durSelect = App.el('select', {}, [10, 15, 20, 30, 45, 60, 90].map((m) => App.el('option', { value: m }, Planner.fmtDur(m))));
+    durSelect.value = String(h.dur || 30);
+    const days = new Set(h.days || []);
+    const dayBtns = [1, 2, 3, 4, 5, 6, 0].map((d) => App.el('button', {
+      class: 'btn secondary' + (days.has(d) ? ' selected' : ''), style: 'width:auto;padding:8px 0;flex:1;min-width:0',
+      onclick: (e) => { days.has(d) ? days.delete(d) : days.add(d); e.currentTarget.classList.toggle('selected', days.has(d)); },
+    }, ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d]));
+    const windowFields = App.el('div', { style: h.window ? '' : 'display:none' }, [
+      App.el('div', { class: 'row' }, [
+        App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Frühestens'), fromInput]),
+        App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Spätestens'), toInput]),
+      ]),
+      App.el('div', { class: 'field' }, [App.el('label', {}, 'Dauer'), durSelect]),
+      App.el('div', { class: 'field' }, [App.el('label', {}, 'Tage (leer = täglich)'), App.el('div', { class: 'fab-row', style: 'flex-wrap:nowrap;gap:4px;margin-bottom:0' }, dayBtns)]),
+    ]);
+    let useWindow = !!h.window;
+
     const content = App.el('div', {}, [
       App.el('h3', {}, isNew ? 'Neue Gewohnheit' : 'Gewohnheit bearbeiten'),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Name'), nameInput]),
+      App.switchRow('Automatisch im Kalender einplanen', 'Die Gewohnheit sucht sich selbst freie Zeit im Zeitfenster – um Termine herum.', useWindow, (v) => { useWindow = v; windowFields.style.display = v ? '' : 'none'; }),
+      windowFields,
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),
         App.el('button', {
           class: 'btn', onclick: async () => {
             h.name = nameInput.value.trim();
             if (!h.name) { nameInput.focus(); return; }
+            if (useWindow) {
+              const from = Planner.parseTime(fromInput.value), to = Planner.parseTime(toInput.value);
+              h.window = { from, to: Math.max(to, from + 15) };
+              h.dur = Number(durSelect.value);
+              h.days = [...days];
+            } else { h.window = null; }
             await DB.put('habits', h);
             App.closeModal();
             App.refresh();
