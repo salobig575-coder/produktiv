@@ -5,55 +5,67 @@ const TasksView = {
     const wrap = App.el('div');
     const tasks = await DB.getAll('tasks');
     tasks.sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || b.createdAt - a.createdAt);
+    const today = App.todayStr();
 
-    const filterRow = App.el('div', { class: 'fab-row' }, [
-      this.filterBtn('open', 'Offen'),
-      this.filterBtn('done', 'Erledigt'),
-      this.filterBtn('all', 'Alle'),
-    ]);
-    wrap.appendChild(filterRow);
-
-    wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
-      App.el('span', { html: Icons.plus(), style: 'width:18px;height:18px' }), 'Neue Aufgabe',
+    const seg = (key, label) => App.el('button', { class: this.filter === key ? 'active' : '', onclick: () => { this.filter = key; App.refresh(); } }, label);
+    wrap.appendChild(App.el('div', { class: 'cal-head' }, [
+      App.el('div', { class: 'seg' }, [seg('open', 'Offen'), seg('done', 'Erledigt'), seg('all', 'Alle')]),
+      App.el('button', { class: 'fab-mini', html: Icons.plus(), title: 'Neue Aufgabe', onclick: () => this.openEditor() }),
     ]));
-    wrap.appendChild(App.el('div', { style: 'height:14px' }));
 
     let visible = tasks;
     if (this.filter === 'open') visible = tasks.filter((t) => !t.done);
     if (this.filter === 'done') visible = tasks.filter((t) => t.done);
 
-    const list = App.el('div', { class: 'list' });
     if (visible.length === 0) {
-      list.appendChild(App.el('div', { class: 'empty' }, [
+      wrap.appendChild(App.el('div', { class: 'empty' }, [
         App.el('div', { class: 'empty-icon', html: Icons.tasks() }),
-        'Keine Aufgaben hier.',
+        this.filter === 'done' ? 'Noch nichts erledigt.' : 'Keine Aufgaben – tippe auf +.',
       ]));
+      return wrap;
     }
-    const today = App.todayStr();
-    visible.forEach((t, i) => {
-      const overdue = t.dueDate && t.dueDate < today && !t.done;
-      const item = App.el('div', { class: 'item' + (t.done ? ' done' : ''), style: `animation-delay:${i * 30}ms` }, [
-        App.el('button', {
-          class: 'checkbox' + (t.done ? ' checked' : ''),
-          html: Icons.check(),
-          onclick: (e) => this.toggleDone(t, e.currentTarget),
-        }),
-        App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(t) }, [
-          App.el('div', { class: 'item-title' }, t.title),
-          App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, [
-            t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
-            t.planStart != null && !t.done ? App.el('span', { class: 'pill active' }, `${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)}`) : null,
-            t.duration ? App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration)) : null,
-            t.subtasks && t.subtasks.length ? App.el('span', { class: 'pill' }, `${t.subtasks.filter((x) => x.done).length}/${t.subtasks.length} Schritte`) : null,
-            t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
-          ]),
-        ]),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(t, e) }),
-      ]);
-      list.appendChild(item);
-    });
-    wrap.appendChild(list);
+
+    // Offene Aufgaben nach Dringlichkeit gruppieren, sonst eine Liste
+    const inDays = (n) => Planner.addDays(today, n);
+    const groups = this.filter === 'open' ? [
+      ['Überfällig', visible.filter((t) => t.dueDate && t.dueDate < today)],
+      ['Heute', visible.filter((t) => t.dueDate === today)],
+      ['Diese Woche', visible.filter((t) => t.dueDate > today && t.dueDate <= inDays(7))],
+      ['Später', visible.filter((t) => t.dueDate > inDays(7))],
+      ['Ohne Datum', visible.filter((t) => !t.dueDate)],
+    ] : [[null, visible]];
+
+    let n = 0;
+    for (const [title, rows] of groups) {
+      if (!rows.length) continue;
+      const card = App.el('div', { class: 'card', style: 'padding:6px 16px' });
+      const list = App.el('div', { class: 'line-list' });
+      rows.forEach((t) => { list.appendChild(this.row(t, today, n++)); });
+      card.appendChild(list);
+      if (title) wrap.appendChild(App.el('div', { class: 'section-label' + (title === 'Überfällig' ? ' danger' : '') }, `${title} · ${rows.length}`));
+      wrap.appendChild(card);
+    }
     return wrap;
+  },
+
+  row(t, today, i) {
+    const overdue = t.dueDate && t.dueDate < today && !t.done;
+    const pills = [
+      t.planStart != null && !t.done ? App.el('span', { class: 'pill active' }, `${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)}`) : null,
+      t.dueDate && this.filter !== 'open' ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
+      t.dueDate && this.filter === 'open' && t.dueDate !== today ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate).slice(0, 6)) : null,
+      t.duration ? App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration)) : null,
+      t.subtasks && t.subtasks.length ? App.el('span', { class: 'pill' }, `${t.subtasks.filter((x) => x.done).length}/${t.subtasks.length}`) : null,
+      t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
+      t.priority === 'high' ? App.el('span', { class: 'pill overdue' }, 'Hoch') : null,
+    ].filter(Boolean);
+    return App.el('div', { class: 'line' + (t.done ? ' done' : ''), style: `animation:popIn .35s var(--ease) both;animation-delay:${Math.min(i, 8) * 25}ms` }, [
+      App.el('button', { class: 'checkbox' + (t.done ? ' checked' : ''), html: Icons.check(), onclick: (e) => this.toggleDone(t, e.currentTarget) }),
+      App.el('div', { class: 'line-main', style: 'cursor:pointer', onclick: () => this.openEditor(t) }, [
+        App.el('div', { class: 'item-title', style: 'white-space:normal' }, t.title),
+        pills.length ? App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;margin-top:4px' }, pills) : null,
+      ]),
+    ]);
   },
 
   filterBtn(key, label) {
@@ -61,6 +73,12 @@ const TasksView = {
       class: 'btn secondary' + (this.filter === key ? ' selected' : ''),
       onclick: () => { this.filter = key; App.refresh(); },
     }, label);
+  },
+
+  async deleteTask(t) {
+    await DB.delete('tasks', t.id);
+    App.refresh();
+    Planner.toast('Aufgabe gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('tasks', t); App.refresh(); } });
   },
 
   async toggleDone(t, btn) {
@@ -168,6 +186,7 @@ const TasksView = {
           },
         }, 'Speichern'),
       ]),
+      !isNew ? App.el('button', { class: 'btn danger', style: 'margin:8px 0 0', onclick: () => { App.closeModal(); this.deleteTask(task); } }, 'Löschen') : null,
     ]);
     App.showModal(content);
     setTimeout(() => titleInput.focus(), 50);

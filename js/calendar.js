@@ -508,7 +508,6 @@ const CalendarView = {
       App.el('div', { style: 'font-weight:800' }, `${fmtShort(start)} – ${fmtShort(last)}`),
       App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: () => { this.selectedDate = Planner.addDays(start, 7); App.refresh(); } }),
     ]));
-    wrap.appendChild(this.renderReview(start, last, data));
     const capacity = s.end - s.start;
     for (let i = 0; i < 7; i++) {
       const ds = Planner.addDays(start, i);
@@ -517,17 +516,21 @@ const CalendarView = {
       const load = Planner.loadMinutes(items);
       const pct = Math.min(100, Math.round((load / capacity) * 100));
       const isToday = ds === this.today();
+      const empty = items.length === 0;
       const card = App.el('div', {
-        class: 'card week-day' + (isToday ? ' today' : ''),
+        class: 'card week-day' + (isToday ? ' today' : '') + (empty ? ' empty-day' : ''),
         'data-date': ds,
-        style: 'cursor:pointer;padding:12px 14px',
+        style: 'cursor:pointer;padding:' + (empty ? '11px 14px' : '12px 14px'),
         onclick: () => { this.selectedDate = ds; this.mode = 'day'; this._scrolled = false; App.refresh(); },
       }, [
-        App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
-          App.el('div', { style: 'font-weight:800' }, d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })),
-          load > capacity ? App.el('span', { class: 'pill overdue' }, 'Überlastet') : App.el('span', { class: 'tag' }, load ? Planner.fmtDur(load) : ''),
+        App.el('div', { class: 'row', style: 'justify-content:space-between' }, [
+          App.el('div', { class: 'row', style: 'gap:8px' }, [
+            App.el('div', { style: 'font-weight:800' + (empty ? ';color:var(--text-dim)' : '') }, d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })),
+            isToday ? App.el('span', { class: 'pill active' }, 'Heute') : null,
+          ]),
+          load > capacity ? App.el('span', { class: 'pill overdue' }, 'Überlastet') : App.el('span', { class: 'tag' }, empty ? 'frei' : Planner.fmtDur(load)),
         ]),
-        App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill' + (load > capacity ? ' over' : ''), style: `width:${pct}%` })]),
+        empty ? null : App.el('div', { class: 'load-bar', style: 'margin-top:8px' }, [App.el('div', { class: 'load-fill' + (load > capacity ? ' over' : ''), style: `width:${pct}%` })]),
       ]);
       if (items.length) {
         const list = App.el('div', { style: 'margin-top:10px;display:flex;flex-direction:column;gap:4px' });
@@ -544,6 +547,7 @@ const CalendarView = {
       }
       wrap.appendChild(card);
     }
+    wrap.appendChild(this.renderReview(start, last, data));
     return wrap;
   },
 
@@ -561,8 +565,8 @@ const CalendarView = {
       let plannedMin = 0;
       for (let i = 0; i < 7; i++) plannedMin += Planner.loadMinutes(Planner.dayItems(Planner.addDays(start, i), data));
       const factor = Planner.estimateFactor(data.tasks);
-      const stat = (n, l) => App.el('div', { class: 'stat', style: 'flex:1 1 calc(50% - 5px)' }, [App.el('div', { class: 'num' }, String(n)), App.el('div', { class: 'lbl' }, l)]);
-      card.appendChild(App.el('div', { class: 'stat-row' }, [
+      const stat = (n, l) => App.el('div', { class: 'mini' }, [App.el('div', { class: 'mini-num' }, String(n)), App.el('div', { class: 'mini-lbl' }, l)]);
+      card.appendChild(App.el('div', { class: 'mini-row' }, [
         stat(doneTasks.length, 'Erledigt'), stat(focusMin, 'Fokus-Min'), stat(habitDays, 'Routinen'), stat(Math.round(plannedMin / 60 * 10) / 10, 'Std. geplant'),
       ]));
       if (Math.abs(factor - 1) > 0.15) {
