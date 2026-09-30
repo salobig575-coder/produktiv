@@ -119,15 +119,56 @@ const CalendarView = {
     return App.el('div', { class: 'date-strip' }, cells);
   },
 
+  // Monatsauswahl; Tipp auf den Monatsnamen öffnet die Jahresübersicht mit Auslastung pro Tag.
   openMonth() {
     const view = new Date(this.selectedDate + 'T00:00:00');
     view.setDate(1);
+    let yearMode = false;
     const container = App.el('div');
     App.showModal(App.el('div', {}, [container]));
 
+    const head = (title, onPrev, onNext, onTitle) => {
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:16px' }, [
+        App.el('h3', { style: 'margin:0' }, yearMode ? 'Jahresübersicht' : 'Datum wählen'),
+        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
+      ]));
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
+        App.el('button', { class: 'icon-btn', style: 'transform:scaleX(-1)', html: Icons.arrowRight(), onclick: onPrev }),
+        App.el('button', { style: 'background:none;border:none;font-weight:800;font-size:15px;cursor:pointer;color:var(--text)', title: 'Ansicht wechseln', onclick: onTitle }, title),
+        App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: onNext }),
+      ]));
+    };
+
     const draw = async () => {
       const data = await Planner.load();
+      container.innerHTML = '';
       const year = view.getFullYear(), month = view.getMonth();
+
+      if (yearMode) {
+        head(String(year), () => { view.setFullYear(year - 1); draw(); }, () => { view.setFullYear(year + 1); draw(); }, () => { yearMode = false; draw(); });
+        const capacity = Math.max(60, data.s.end - data.s.start);
+        const grid = App.el('div', { class: 'year-grid' });
+        for (let m = 0; m < 12; m++) {
+          const first = new Date(year, m, 1);
+          const offset = (first.getDay() + 6) % 7;
+          const days = new Date(year, m + 1, 0).getDate();
+          const cells = App.el('div', { class: 'year-cells' });
+          for (let i = 0; i < offset; i++) cells.appendChild(App.el('span', { class: 'yc' }));
+          for (let d = 1; d <= days; d++) {
+            const ds = App.todayStr(new Date(year, m, d));
+            const load = Planner.loadMinutes(Planner.dayItems(ds, data));
+            const lvl = load === 0 ? 0 : load > capacity ? 4 : Math.min(3, Math.ceil((load / capacity) * 3));
+            cells.appendChild(App.el('span', { class: `yc l${lvl}` + (ds === this.today() ? ' today' : '') + (ds === this.selectedDate ? ' sel' : '') }));
+          }
+          grid.appendChild(App.el('div', { class: 'year-month' + (m === month ? ' current' : ''), onclick: () => { view.setMonth(m); yearMode = false; draw(); } }, [
+            App.el('div', { class: 'year-name' }, first.toLocaleDateString('de-DE', { month: 'short' })),
+            cells,
+          ]));
+        }
+        container.appendChild(grid);
+        return;
+      }
+
       const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const grid = App.el('div', { class: 'cal-grid' });
@@ -141,17 +182,9 @@ const CalendarView = {
           onclick: () => { this.selectedDate = dateStr; App.closeModal(); App.refresh(); },
         }, [App.el('span', {}, String(day)), busy ? App.el('span', { class: 'cal-dot' }) : null]));
       }
-      container.innerHTML = '';
-      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:16px' }, [
-        App.el('h3', { style: 'margin:0' }, 'Datum wählen'),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
-      ]));
-      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
-        App.el('button', { class: 'icon-btn', style: 'transform:scaleX(-1)', html: Icons.arrowRight(), onclick: () => { view.setMonth(view.getMonth() - 1); draw(); } }),
-        App.el('div', { style: 'font-weight:800' }, view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })),
-        App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: () => { view.setMonth(view.getMonth() + 1); draw(); } }),
-      ]));
+      head(view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }), () => { view.setMonth(month - 1); draw(); }, () => { view.setMonth(month + 1); draw(); }, () => { yearMode = true; draw(); });
       container.appendChild(grid);
+      container.appendChild(App.el('div', { class: 'tag', style: 'text-align:center;margin-top:12px' }, 'Tipp auf den Monat für die Jahresübersicht'));
     };
     draw();
   },
@@ -618,6 +651,9 @@ const CalendarView = {
       App.el('option', { value: '10' }, '10 Minuten vorher'), App.el('option', { value: '30' }, '30 Minuten vorher'), App.el('option', { value: '60' }, '1 Stunde vorher'),
     ]);
     remindSelect.value = e.remind == null ? '' : String(e.remind);
+    const untilInput = App.el('input', { type: 'date', value: e.until || '' });
+    const untilField = App.el('div', { class: 'field', style: (e.repeat || 'none') === 'none' ? 'display:none' : '' }, [App.el('label', {}, 'Wiederholen bis (optional)'), untilInput]);
+    repeatSelect.addEventListener('change', () => { untilField.style.display = repeatSelect.value === 'none' ? 'none' : ''; });
 
     // Hinweis bei Überschneidung mit anderen Blöcken (rein informativ)
     const conflict = App.el('div', { class: 'tag', style: 'color:var(--warn);margin:-4px 0 12px;display:none' });
@@ -641,6 +677,7 @@ const CalendarView = {
       e.kind = kindSelect.value;
       e.level = levelSelect.value;
       e.repeat = repeatSelect.value;
+      e.until = e.repeat === 'none' ? '' : untilInput.value;
       e.remind = remindSelect.value === '' ? null : Number(remindSelect.value);
       if (e.start + e.dur > 1440) e.dur = 1440 - e.start;
       await DB.put('events', e);
@@ -689,6 +726,7 @@ const CalendarView = {
       ]),
       conflict,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Wiederholung'), repeatSelect]),
+      untilField,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Erinnerung'), remindSelect]),
       ...buttons,
     ]));

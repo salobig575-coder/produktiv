@@ -44,7 +44,7 @@ const TodayView = {
     const items = Planner.dayItems(today, data).filter((i) => !i.done && i.end > now && !(i.start <= now));
     const planned = new Set(Planner.dayItems(today, data).filter((i) => i.type === 'task').map((i) => i.id));
     const due = data.tasks.filter((t) => !t.done && t.dueDate && t.dueDate <= today && !planned.has(t.id)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    const looseHabits = data.habits.filter((h) => !h.window);
+    const looseHabits = data.habits.filter((h) => !h.window).sort((a, b) => HabitsView.orderOf(a) - HabitsView.orderOf(b));
     const todayCard = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.tasks(), style: 'width:14px;height:14px' }), 'Heute noch']),
     ]);

@@ -44,6 +44,7 @@ const Planner = {
   occursOn(ev, date) {
     if (date < ev.date) return false;
     if (ev.skip && ev.skip.includes(date)) return false;
+    if (ev.until && date > ev.until) return false;
     const r = ev.repeat || 'none';
     if (r === 'none') return ev.date === date;
     const d = new Date(date + 'T00:00:00'), s = new Date(ev.date + 'T00:00:00');
@@ -396,7 +397,7 @@ const Planner = {
       lines.push('END:VEVENT');
     };
     const rr = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
-    data.events.forEach((e) => add(e.id, e.title, e.date, e.start, e.dur, rr[e.repeat], e.skip));
+    data.events.forEach((e) => add(e.id, e.title, e.date, e.start, e.dur, rr[e.repeat] ? rr[e.repeat] + (e.until ? `;UNTIL=${e.until.replace(/-/g, '')}T235959` : '') : null, e.skip));
     data.tasks.filter((t) => t.planStart != null && t.planDate && !t.done).forEach((t) => add(t.id, t.title, t.planDate, t.planStart, t.duration || 30));
     lines.push('END:VCALENDAR');
     return lines.join('\r\n');
@@ -423,7 +424,7 @@ const Planner = {
           events.push({
             id: 'ics-' + (cur.uid || DB.uid()), title: cur.title, date: App.todayStr(cur.start), start: startMin,
             dur: Math.max(15, Math.min(dur, 1440 - startMin)), kind: 'event', repeat: cur.repeat || 'none', remind: null,
-            skip: cur.skip.map((d) => App.todayStr(d)), createdAt: Date.now(),
+            skip: cur.skip.map((d) => App.todayStr(d)), until: cur.until || '', createdAt: Date.now(),
           });
         } else skipped++;
         cur = null; continue;
@@ -439,6 +440,8 @@ const Planner = {
         if (f === 'DAILY') cur.repeat = 'daily';
         else if (f === 'MONTHLY') cur.repeat = 'monthly';
         else if (f === 'WEEKLY') cur.repeat = /BYDAY=MO,TU,WE,TH,FR(?!,)/.test(line) ? 'weekdays' : 'weekly';
+        const u = line.match(/UNTIL=(\d{4})(\d{2})(\d{2})/);
+        if (u) cur.until = `${u[1]}-${u[2]}-${u[3]}`;
       }
     }
     return { events, skipped };

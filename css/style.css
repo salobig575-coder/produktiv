@@ -1167,3 +1167,22 @@ a { color: var(--accent); }
 .tl-scroll::-webkit-scrollbar { display: none; }
 
 .mini-link { background: none; border: none; color: var(--accent); font-weight: 800; font-size: 12px; cursor: pointer; text-transform: none; letter-spacing: 0; padding: 0; }
+
+/* ---------- Habits sortieren, Jahresübersicht ---------- */
+.grip { background: none; border: none; color: var(--text-dim); width: 22px; height: 28px; padding: 0; cursor: grab; touch-action: none; flex: none; opacity: .7; }
+.grip svg { width: 18px; height: 18px; }
+.item.dragging-row { z-index: 10; position: relative; box-shadow: var(--shadow-lg); transition: none; }
+
+.year-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.year-month { padding: 8px; border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: transform .2s var(--ease-spring); }
+.year-month:active { transform: scale(.96); }
+.year-month.current { border-color: var(--accent); }
+.year-name { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.year-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.yc { aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); }
+.yc.l1 { background: rgba(var(--accent-rgb), .3); }
+.yc.l2 { background: rgba(var(--accent-rgb), .6); }
+.yc.l3 { background: var(--accent); }
+.yc.l4 { background: var(--danger); }
+.yc.today { outline: 2px solid var(--text); outline-offset: 1px; }
+.yc.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
