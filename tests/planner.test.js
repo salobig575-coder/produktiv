@@ -106,3 +106,38 @@ test('Feiertage: Ostern und bundeslandabhängige Tage', () => {
   assert.strictEqual(Holidays.name('2026-11-18', 'SN'), 'Buß- und Bettag');
   assert.strictEqual(Holidays.name('2026-12-25', ''), null, 'deaktiviert');
 });
+
+test('Deadline-Risiko: zu viel Arbeit vor der Fälligkeit wird markiert', () => {
+  const s = { start: 480, end: 1200, buffer: 0, holidays: '' };
+  const due = Planner.addDays(today, 1);
+  const mk = (id, dur) => ({ id, title: id, done: false, dueDate: due, duration: dur, createdAt: Number(id.slice(1)) });
+  // 2 Tage à ~10 h Fenster × 0,85 ≈ 1000 min frei; 3 × 400 min passen nicht komplett
+  const data = { events: [], habits: [], logs: [], sleep: null, s, tasks: [mk('t1', 400), mk('t2', 400), mk('t3', 400)] };
+  const risk = Planner.atRisk(data);
+  assert.ok(!risk.has('t1'));
+  assert.ok(risk.has('t3'));
+  assert.strictEqual(Planner.atRisk({ ...data, tasks: [mk('t1', 30)] }).size, 0);
+});
+
+test('Erinnerungen: Fokus-Block meldet sich zum Beginn, Aufgabe 5 Minuten vorher', () => {
+  const s = { start: 480, end: 1200 };
+  const data = {
+    s, habits: [], logs: [], sleep: null,
+    events: [{ id: 'f1', title: 'Deep Work', date: today, start: 600, dur: 90, kind: 'focus', repeat: 'none', remind: null, skip: [] }],
+    tasks: [{ id: 'p1', title: 'Mail', done: false, planDate: today, planStart: 700, duration: 30, dueDate: '' }],
+  };
+  const list = Planner.reminderList(data, today);
+  const focus = list.find((r) => r.focus);
+  assert.strictEqual(focus.at, 600);
+  assert.strictEqual(list.find((r) => r.key === `p1:${today}`).at, 695);
+});
+
+test('Wiederkehrende Aufgabe stoppt am Enddatum', async () => {
+  const puts = [];
+  global.DB.put = async (store, obj) => { puts.push(obj); };
+  const far = Planner.addDays(today, 5);
+  await Planner.spawnNext({ id: 'r', title: 'x', repeat: 'daily', dueDate: far, repeatUntil: far, done: true });
+  assert.strictEqual(puts.length, 0);
+  await Planner.spawnNext({ id: 'r2', title: 'y', repeat: 'daily', dueDate: far, repeatUntil: Planner.addDays(far, 3), done: true });
+  assert.strictEqual(puts.length, 2); // Original (spawned-Markierung) + neue Aufgabe
+});

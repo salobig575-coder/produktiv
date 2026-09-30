@@ -147,12 +147,15 @@ const HabitsView = {
     const el = e.currentTarget.closest('.item');
     if (el) el.classList.add('removing');
     setTimeout(async () => {
+      const removedLogs = (await DB.getAll('habitLogs')).filter((x) => x.habitId === h.id);
       await DB.delete('habits', h.id);
-      const logs = await DB.getAll('habitLogs');
-      for (const l of logs.filter((x) => x.habitId === h.id)) {
-        await DB.delete('habitLogs', l.id);
-      }
+      for (const l of removedLogs) await DB.delete('habitLogs', l.id);
       App.refresh();
+      Planner.toast('Gewohnheit gelöscht.', { label: 'Rückgängig', fn: async () => {
+        await DB.put('habits', h);
+        for (const l of removedLogs) await DB.put('habitLogs', l);
+        App.refresh();
+      } });
     }, 220);
   },
 
@@ -192,9 +195,12 @@ const HabitsView = {
             h.name = nameInput.value.trim();
             if (!h.name) { nameInput.focus(); return; }
             if (useWindow) {
-              const from = Planner.parseTime(fromInput.value), to = Planner.parseTime(toInput.value);
-              h.window = { from, to: Math.max(to, from + 15) };
-              h.dur = Number(durSelect.value);
+              const dur = Number(durSelect.value);
+              let from = Planner.parseTime(fromInput.value);
+              const to = Planner.parseTime(toInput.value);
+              if (from + dur > 1440) from = 1440 - dur;
+              h.window = { from, to: Math.min(1440, Math.max(to, from + dur)) };
+              h.dur = dur;
               h.days = [...days];
             } else { h.window = null; }
             await DB.put('habits', h);

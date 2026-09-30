@@ -614,16 +614,16 @@ nav.bottomnav button:active { transform: scale(.9); }
 /* ---------- Habits ---------- */
 .habit-grid {
   display: grid;
-  grid-template-columns: minmax(64px, 1fr) repeat(7, 26px);
+  grid-template-columns: minmax(0, 1fr) repeat(7, 24px);
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 12px;
 }
 .habit-grid .head { color: var(--text-dim); text-align: center; font-weight: 700; }
 .habit-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 10px;
   border: 1.5px solid var(--border);
   background: var(--surface-2);
@@ -1313,3 +1313,14 @@ a { color: var(--accent); }
 #ptr svg { width: 20px; height: 20px; }
 @keyframes ptrSpin { to { transform: translate(-50%, 34px) rotate(360deg); } }
 #ptr.spin { animation: ptrSpin .9s linear infinite; }
+
+/* ================= Barrierefreiheit & Kleinigkeiten ================= */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; } /* Felder haben bereits einen Fokusrand */
+.modal:focus { outline: none; }
+.pill.warn { background: rgba(var(--warn-rgb), .18); color: var(--warn); }
+
+/* Lange Namen kürzen statt die Seite zu verbreitern */
+.chip { max-width: 100%; min-width: 0; }
+.chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip-dot { flex: none; }

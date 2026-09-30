@@ -1,7 +1,7 @@
 {
   "name": "Produktiv",
   "short_name": "Produktiv",
-  "description": "Produktivität und Fitness an einem Ort: Aufgaben, Notizen, Fokus-Timer, Habits, Workouts und Kalorienrechner.",
+  "description": "Planer, Fokus-Timer und Fitness an einem Ort: Kalender, Aufgaben, Routinen, Notizen und Workouts.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -22,7 +22,7 @@
       "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -33,5 +33,11 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "lang": "de",
+  "categories": [
+    "productivity",
+    "lifestyle",
+    "health"
   ]
 }

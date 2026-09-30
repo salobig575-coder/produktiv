@@ -258,7 +258,7 @@ const ExercisesView = {
       const embed = Exercises.youTubeEmbed(ex.videoUrl);
       mediaBox.appendChild(embed
         ? App.el('div', { html: `<iframe src="${embed}" style="width:100%;aspect-ratio:16/9;border:none;border-radius:12px" allowfullscreen></iframe>` })
-        : App.el('a', { href: ex.videoUrl, target: '_blank', rel: 'noopener', class: 'btn secondary', style: 'display:flex' }, '▶ Video ansehen'));
+        : (/^https?:\/\//i.test(ex.videoUrl) ? App.el('a', { href: ex.videoUrl, target: '_blank', rel: 'noopener noreferrer', class: 'btn secondary', style: 'display:flex' }, '▶ Video ansehen') : null));
     }
 
     const content = App.el('div', {}, [

@@ -28,6 +28,7 @@ const FocusView = {
     if (opts.level) s.level = opts.level;
     s.intention = opts.intention || '';
     s.taskId = opts.taskId || null;
+    this.persist();
     return true;
   },
 
@@ -190,6 +191,8 @@ const FocusView = {
     window.onbeforeunload = s.level === 'strict' && s.mode === 'focus' ? (e) => { e.preventDefault(); e.returnValue = ''; } : null;
     clearInterval(s.intervalId);
     s.intervalId = setInterval(() => this.tick(), 1000);
+    try { const A = window.AudioContext || window.webkitAudioContext; if (A) { this._ctx = this._ctx || new A(); if (this._ctx.resume) this._ctx.resume(); } } catch (e) {}
+    this.persist();
     App.refresh();
   },
 
@@ -199,6 +202,7 @@ const FocusView = {
     s.stopAt = null;
     window.onbeforeunload = null;
     clearInterval(s.intervalId);
+    this.persist();
     App.refresh();
   },
 
@@ -211,6 +215,7 @@ const FocusView = {
     s.mode = 'focus';
     s.remaining = s.focusMin * 60;
     s.sessionStart = null;
+    this.persist();
     App.refresh();
   },
 
@@ -231,19 +236,8 @@ const FocusView = {
 
     if (s.remaining <= 0) {
       if (s.mode === 'focus') {
-        await DB.put('focusSessions', {
-          id: DB.uid(),
-          startedAt: s.sessionStart || Date.now(),
-          duration: s.focusMin * 60,
-          intention: s.intention || '',
-          level: s.level,
-          taskId: s.taskId || null,
-        });
-        // Ist-Zeit an der Aufgabe festhalten (Grundlage der lernenden Schätzung)
-        if (s.taskId) {
-          const t = await DB.get('tasks', s.taskId);
-          if (t) { t.actual = (t.actual || 0) + s.focusMin; await DB.put('tasks', t); }
-        }
+        await this.recordFocus();
+        this.beep();
         s.stopAt = null;
         window.onbeforeunload = null;
         Planner.toast('Fokus geschafft 🎉');
@@ -256,7 +250,72 @@ const FocusView = {
       }
       s.endAt = Date.now() + s.remaining * 1000;
       s.sessionStart = Date.now();
-      if (App.current === 'focus') App.refresh();
+      this.persist();
+      if (App.current === 'planen' && PlanenHub.activeTab === 'focus') App.refresh();
+    }
+  },
+
+  // Fertige Fokus-Session speichern und die Ist-Zeit an der Aufgabe festhalten (Grundlage der lernenden Schätzung)
+  async recordFocus() {
+    const s = this.state;
+    await DB.put('focusSessions', {
+      id: DB.uid(),
+      startedAt: s.sessionStart || Date.now(),
+      duration: s.focusMin * 60,
+      intention: s.intention || '',
+      level: s.level,
+      taskId: s.taskId || null,
+    });
+    if (s.taskId) {
+      const t = await DB.get('tasks', s.taskId);
+      if (t) { t.actual = (t.actual || 0) + s.focusMin; t.updatedAt = Date.now(); await DB.put('tasks', t); }
+    }
+  },
+
+  // Kurzer Ton am Ende (Audio wird beim Start per Fingertipp freigeschaltet)
+  beep() {
+    try {
+      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+      const A = window.AudioContext || window.webkitAudioContext;
+      if (!A || !this._ctx) return;
+      const c = this._ctx, o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = 880; g.gain.value = 0.08;
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + 0.25);
+    } catch (e) {}
+  },
+
+  // Laufenden Timer überleben lassen (iOS beendet Web-Apps im Hintergrund)
+  persist() {
+    try {
+      const s = this.state;
+      localStorage.setItem('focusState', JSON.stringify({
+        mode: s.mode, focusMin: s.focusMin, breakMin: s.breakMin, remaining: s.remaining, running: s.running, endAt: s.endAt || null,
+        sessionStart: s.sessionStart, level: s.level, intention: s.intention, taskId: s.taskId, attempts: s.attempts,
+      }));
+    } catch (e) {}
+  },
+
+  async restore() {
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem('focusState') || 'null'); } catch (e) {}
+    if (!o) return;
+    const s = this.state;
+    Object.assign(s, { mode: o.mode || 'focus', focusMin: o.focusMin || 25, breakMin: o.breakMin || 5, level: o.level || 'normal', intention: o.intention || '', taskId: o.taskId || null, attempts: o.attempts || 0, sessionStart: o.sessionStart || null });
+    if (o.running && o.endAt) {
+      const left = Math.round((o.endAt - Date.now()) / 1000);
+      if (left > 0) {
+        s.remaining = left; s.endAt = o.endAt; s.running = true;
+        s.intervalId = setInterval(() => this.tick(), 1000);
+        if (s.level === 'strict' && s.mode === 'focus') window.onbeforeunload = (e) => { e.preventDefault(); e.returnValue = ''; };
+        return;
+      }
+      // Die Zeit ist abgelaufen, während die App weg war
+      if (o.mode === 'focus') { await this.recordFocus(); Planner.toast('Fokus geschafft – während du weg warst 🎉'); }
+      s.mode = 'focus'; s.remaining = s.focusMin * 60; s.running = false; s.sessionStart = null;
+      this.persist();
+    } else {
+      s.remaining = o.remaining > 0 ? o.remaining : s.focusMin * 60;
     }
   },
 };
