@@ -606,16 +606,16 @@ nav.bottomnav button:active { transform: scale(.9); }
 /* ---------- Habits ---------- */
 .habit-grid {
   display: grid;
-  grid-template-columns: 1fr repeat(7, 32px);
+  grid-template-columns: minmax(64px, 1fr) repeat(7, 26px);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
 }
 .habit-grid .head { color: var(--text-dim); text-align: center; font-weight: 700; }
 .habit-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 10px;
   border: 1.5px solid var(--border);
   background: var(--surface-2);

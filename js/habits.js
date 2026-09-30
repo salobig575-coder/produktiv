@@ -48,7 +48,7 @@ const HabitsView = {
         App.el('span', { html: Icons.habits(), style: `width:20px;height:20px;flex-shrink:0;color:${streak > 0 ? 'var(--warn)' : 'var(--text-dim)'}` }),
         App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(h) }, [
           App.el('div', { class: 'item-title' }, h.name),
-          App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} Tage in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
+          App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} ${streak === 1 ? "Tag" : "Tage"} in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
         ]),
         App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
       ]));

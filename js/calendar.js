@@ -619,6 +619,19 @@ const CalendarView = {
     ]);
     remindSelect.value = e.remind == null ? '' : String(e.remind);
 
+    // Hinweis bei Überschneidung mit anderen Blöcken (rein informativ)
+    const conflict = App.el('div', { class: 'tag', style: 'color:var(--warn);margin:-4px 0 12px;display:none' });
+    let cdata = null;
+    const checkConflict = () => {
+      if (!cdata) return;
+      const start = Planner.parseTime(timeInput.value), end = start + Number(durSelect.value);
+      const clash = Planner.dayItems(dateInput.value || e.date, cdata).find((i) => !(i.id === e.id && i.type === 'event') && i.start < end && i.end > start);
+      conflict.textContent = clash ? `Überschneidet sich mit „${clash.title}“ (${Planner.fmt(clash.start)}–${Planner.fmt(clash.end)}).` : '';
+      conflict.style.display = clash ? '' : 'none';
+    };
+    [dateInput, timeInput, durSelect].forEach((el) => el.addEventListener('change', checkConflict));
+    Planner.load().then((d) => { cdata = d; checkConflict(); });
+
     const save = async () => {
       e.title = titleInput.value.trim();
       if (!e.title) { titleInput.focus(); return; }
@@ -674,6 +687,7 @@ const CalendarView = {
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Beginn'), timeInput]),
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Dauer'), durSelect]),
       ]),
+      conflict,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Wiederholung'), repeatSelect]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Erinnerung'), remindSelect]),
       ...buttons,

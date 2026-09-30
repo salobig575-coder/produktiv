@@ -19,6 +19,8 @@ const App = {
     document.getElementById('searchBtn').innerHTML = Icons.search();
     document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
 
+    this.bindShortcuts();
+
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
 
@@ -31,6 +33,34 @@ const App = {
       splash.classList.add('hide');
       setTimeout(() => splash.remove(), 550);
     }, 1200);
+  },
+
+  // Tastenkürzel für Mac und PC (greifen nicht beim Tippen in Feldern)
+  bindShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      const typing = ['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable;
+      if (e.key === 'Escape' && this._modal) { this.closeModal(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); SearchView.open(); return; }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey || this._modal) return;
+      const cal = this.current === 'planen' && PlanenHub.activeTab === 'calendar';
+      const step = (n) => { CalendarView.selectedDate = Planner.addDays(CalendarView.selectedDate || this.todayStr(), n * (CalendarView.mode === 'week' ? 7 : 1)); this.refresh(); };
+      const keys = {
+        '/': () => SearchView.open(),
+        '1': () => this.navigate('today'), '2': () => this.navigate('planen'), '3': () => this.navigate('fitness'),
+      };
+      if (cal) {
+        Object.assign(keys, {
+          ArrowLeft: () => step(-1), ArrowRight: () => step(1),
+          t: () => { CalendarView.selectedDate = this.todayStr(); this.refresh(); },
+          d: () => { CalendarView.mode = 'day'; this.refresh(); },
+          w: () => { CalendarView.mode = 'week'; this.refresh(); },
+          n: () => { const h = Math.min(23, new Date().getHours() + 1); CalendarView.openEventEditor(null, h * 60); },
+        });
+      }
+      if (this.current === 'planen' && PlanenHub.activeTab === 'tasks') keys.n = () => TasksView.openEditor();
+      if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
+    });
   },
 
   navigate(route, opts = {}) {
