@@ -35,16 +35,11 @@ const Native = {
       const now = Date.now(), list = [];
       for (let i = 0; i < 7; i++) {
         const date = Planner.addDays(App.todayStr(), i);
-        for (const ev of data.events) {
-          if (ev.remind == null || !Planner.occursOn(ev, date)) continue;
+        for (const r of Planner.reminderList(data, date)) {
           const at = new Date(date + 'T00:00:00');
-          at.setMinutes(ev.start - ev.remind);
+          at.setMinutes(r.at);
           if (at.getTime() <= now) continue;
-          list.push({
-            id: this.hash(ev.id + date), title: 'Produktiv',
-            body: ev.remind ? `${ev.title} startet in ${ev.remind} min (${Planner.fmt(ev.start)})` : `${ev.title} startet jetzt`,
-            schedule: { at },
-          });
+          list.push({ id: this.hash(r.key), title: 'Produktiv', body: r.msg, schedule: { at } });
         }
       }
       if (list.length) await LN.schedule({ notifications: list.slice(0, 60) });

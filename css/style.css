@@ -1165,3 +1165,5 @@ a { color: var(--accent); }
 
 .tl-scroll { max-height: min(62vh, 560px); overflow-y: auto; overscroll-behavior: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .tl-scroll::-webkit-scrollbar { display: none; }
+
+.mini-link { background: none; border: none; color: var(--accent); font-weight: 800; font-size: 12px; cursor: pointer; text-transform: none; letter-spacing: 0; padding: 0; }

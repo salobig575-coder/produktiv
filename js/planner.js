@@ -331,24 +331,38 @@ const Planner = {
     this.checkReminders();
   },
 
+  // Alle Erinnerungen eines Tages (Minuten seit Mitternacht): Termine, geplante Aufgaben, Morgen-Hinweis für Fälliges.
+  reminderList(data, date) {
+    const s = data.s, list = [];
+    for (const ev of data.events) {
+      if (ev.remind == null || !this.occursOn(ev, date)) continue;
+      list.push({
+        key: `${ev.id}:${date}`, at: ev.start - ev.remind, until: ev.start + 1,
+        msg: ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`,
+      });
+    }
+    for (const t of data.tasks) {
+      if (t.done || t.planDate !== date || t.planStart == null) continue;
+      list.push({ key: `${t.id}:${date}`, at: t.planStart - 5, until: t.planStart + 1, msg: `${t.title} ist gleich dran (${this.fmt(t.planStart)})` });
+    }
+    const dueCount = data.tasks.filter((t) => !t.done && t.dueDate && (date === App.todayStr() ? t.dueDate <= date : t.dueDate === date)).length;
+    if (dueCount) list.push({ key: `digest:${date}`, at: s.start, until: s.end, msg: dueCount === 1 ? '1 Aufgabe ist heute fällig.' : `${dueCount} Aufgaben sind heute fällig.` });
+    return list;
+  },
+
   async checkReminders() {
-    const s = await this.settings();
-    if (!s.reminders) return;
-    const today = App.todayStr(), now = this.nowMin();
     const data = await this.load();
+    if (!data.s.reminders) return;
+    const today = App.todayStr(), now = this.nowMin();
     let fired = {};
     try { fired = JSON.parse(localStorage.getItem('plannerFired') || '{}'); } catch (e) {}
     for (const k of Object.keys(fired)) if (!k.endsWith(today)) delete fired[k];
-    for (const ev of data.events) {
-      if (ev.remind == null || !this.occursOn(ev, today)) continue;
-      const key = `${ev.id}:${today}`;
-      const at = ev.start - ev.remind;
-      if (fired[key] || now < at || now >= ev.start + 1) continue;
-      fired[key] = 1;
-      const msg = ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`;
-      this.toast(msg);
+    for (const r of this.reminderList(data, today)) {
+      if (fired[r.key] || now < r.at || now >= r.until) continue;
+      fired[r.key] = 1;
+      this.toast(r.msg);
       try {
-        if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: msg, icon: 'icons/icon.svg' });
+        if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: r.msg, icon: 'icons/icon-192.png' });
       } catch (e) {}
     }
     try { localStorage.setItem('plannerFired', JSON.stringify(fired)); } catch (e) {}
@@ -360,7 +374,7 @@ const Planner = {
       t.appendChild(App.el('button', { class: 'toast-action', onclick: () => { t.remove(); action.fn(); } }, action.label));
     }
     document.body.appendChild(t);
-    const life = action ? 6000 : 4200;
+    const life = action ? 8000 : 4200;
     setTimeout(() => t.classList.add('hide'), life);
     setTimeout(() => t.remove(), life + 500);
   },

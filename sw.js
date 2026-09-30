@@ -1,4 +1,4 @@
-const CACHE_NAME = 'produktiv-v31';
+const CACHE_NAME = 'produktiv-v32';
 const ASSETS = [
   './',
   './index.html',

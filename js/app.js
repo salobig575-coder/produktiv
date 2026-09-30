@@ -25,7 +25,12 @@ const App = {
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
 
     if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+      const hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.register('sw.js').catch(() => {});
+      // Cache-first-Service-Worker: neue Versionen kommen im Hintergrund an – dann zum Neuladen auffordern
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hadController) Planner.toast('Neue Version verfügbar', { label: 'Neu laden', fn: () => location.reload() });
+      });
     }
 
     const splash = document.getElementById('splash');

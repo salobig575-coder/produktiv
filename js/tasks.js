@@ -42,7 +42,21 @@ const TasksView = {
       const list = App.el('div', { class: 'line-list' });
       rows.forEach((t) => { list.appendChild(this.row(t, today, n++)); });
       card.appendChild(list);
-      if (title) wrap.appendChild(App.el('div', { class: 'section-label' + (title === 'Überfällig' ? ' danger' : '') }, `${title} · ${rows.length}`));
+      if (title) {
+        const label = App.el('div', { class: 'section-label row' + (title === 'Überfällig' ? ' danger' : ''), style: 'justify-content:space-between' }, [`${title} · ${rows.length}`]);
+        if (title === 'Überfällig') {
+          label.appendChild(App.el('button', { class: 'mini-link', onclick: async () => {
+            const before = rows.map((t) => ({ id: t.id, due: t.dueDate }));
+            for (const t of rows) { t.dueDate = today; t.updatedAt = Date.now(); await DB.put('tasks', t); }
+            App.refresh();
+            Planner.toast(`${rows.length} auf heute gelegt.`, { label: 'Rückgängig', fn: async () => {
+              for (const b of before) { const t = await DB.get('tasks', b.id); if (t) { t.dueDate = b.due; await DB.put('tasks', t); } }
+              App.refresh();
+            } });
+          } }, 'Alle auf heute'));
+        }
+        wrap.appendChild(label);
+      }
       wrap.appendChild(card);
     }
     return wrap;
