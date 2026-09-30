@@ -46,7 +46,7 @@ const NotesView = {
           App.el('div', { class: 'item-title' }, n.title || '(ohne Titel)'),
           App.el('div', { class: 'item-meta' }, preview),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => { e.stopPropagation(); this.remove(n, e); } }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: (e) => { e.stopPropagation(); this.remove(n, e); } }),
       ]));
     });
   },

@@ -1,0 +1,19 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax der Skripte prüfen
+        run: for f in js/*.js sw.js; do node --check "$f"; done
+      - name: Planer-Tests
+        run: node --test tests/*.test.js

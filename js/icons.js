@@ -74,4 +74,7 @@ const Icons = {
   copy() {
     return this.wrap('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6.8A1.8 1.8 0 0 0 13.2 5H6.8A1.8 1.8 0 0 0 5 6.8v6.4A1.8 1.8 0 0 0 6.8 15H9"/>');
   },
+  grip() {
+    return this.wrap('<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/>');
+  },
 };

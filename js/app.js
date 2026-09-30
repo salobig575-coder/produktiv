@@ -16,19 +16,72 @@ const App = {
       btn.addEventListener('click', () => this.navigate(route));
     });
     document.getElementById('settingsBtn').addEventListener('click', () => SettingsView.open());
+    document.getElementById('searchBtn').innerHTML = Icons.search();
+    document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
+
+    this.bindShortcuts();
 
     const hash = location.hash.replace('#', '');
     this.navigate(this.routes[hash] ? hash : 'today', { instant: true });
 
     if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+      const hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.register('sw.js').catch(() => {});
+      // Cache-first-Service-Worker: neue Versionen kommen im Hintergrund an – dann zum Neuladen auffordern
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hadController) Planner.toast('Neue Version verfügbar', { label: 'Neu laden', fn: () => location.reload() });
+      });
     }
+
+    setTimeout(() => this.backupReminder(), 6000);
 
     const splash = document.getElementById('splash');
     setTimeout(() => {
       splash.classList.add('hide');
       setTimeout(() => splash.remove(), 550);
     }, 1200);
+  },
+
+  // Ohne Sync gibt es nur eine lokale Kopie: alle 14 Tage an eine Sicherung erinnern (erster Start setzt nur die Uhr).
+  async backupReminder() {
+    try {
+      const sess = await DB.get('settings', 'syncSession');
+      if (sess && sess.value) return;
+      const last = Number(localStorage.getItem('lastBackup') || 0);
+      if (!last) { localStorage.setItem('lastBackup', String(Date.now())); return; }
+      if (Date.now() - last < 14 * 86400000) return;
+      const has = (await DB.getAll('tasks')).length + (await DB.getAll('events')).length + (await DB.getAll('workoutSessions')).length;
+      if (has === 0) return;
+      Planner.toast('Backup fällig – deine Daten liegen nur auf diesem Gerät.', { label: 'Sichern', fn: () => SettingsView.exportFile() });
+    } catch (e) {}
+  },
+
+  // Tastenkürzel für Mac und PC (greifen nicht beim Tippen in Feldern)
+  bindShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      const typing = ['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable;
+      if (e.key === 'Escape' && this._modal) { this.closeModal(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); SearchView.open(); return; }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey || this._modal) return;
+      const cal = this.current === 'planen' && PlanenHub.activeTab === 'calendar';
+      const step = (n) => { CalendarView.selectedDate = Planner.addDays(CalendarView.selectedDate || this.todayStr(), n * (CalendarView.mode === 'week' ? 7 : 1)); this.refresh(); };
+      const keys = {
+        '/': () => SearchView.open(),
+        '1': () => this.navigate('today'), '2': () => this.navigate('planen'), '3': () => this.navigate('fitness'),
+      };
+      if (cal) {
+        Object.assign(keys, {
+          ArrowLeft: () => step(-1), ArrowRight: () => step(1),
+          t: () => { CalendarView.selectedDate = this.todayStr(); this.refresh(); },
+          d: () => { CalendarView.mode = 'day'; this.refresh(); },
+          w: () => { CalendarView.mode = 'week'; this.refresh(); },
+          n: () => { const h = Math.min(23, new Date().getHours() + 1); CalendarView.openEventEditor(null, h * 60); },
+        });
+      }
+      if (this.current === 'planen' && PlanenHub.activeTab === 'tasks') keys.n = () => TasksView.openEditor();
+      if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
+    });
   },
 
   navigate(route, opts = {}) {
@@ -76,6 +129,7 @@ const App = {
     for (const [k, v] of Object.entries(attrs)) {
       if (k === 'class') node.className = v;
       else if (k === 'html') node.innerHTML = v;
+      else if (k === 'title' && tag === 'button') { node.setAttribute('title', v); node.setAttribute('aria-label', v); }
       else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
       else if (typeof v === 'boolean') { if (v) node.setAttribute(k, ''); else node.removeAttribute(k); }
       else node.setAttribute(k, v);

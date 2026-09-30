@@ -14,7 +14,7 @@ const CalendarView = {
     const data = await Planner.load();
     const s = data.s;
 
-    wrap.appendChild(this.renderHeader());
+    wrap.appendChild(this.renderHeader(Holidays.name(this.selectedDate, s.holidays)));
     wrap.appendChild(this.renderQuickAdd());
 
     if (this.mode === 'week') {
@@ -24,6 +24,7 @@ const CalendarView = {
 
     wrap.appendChild(this.renderDateStrip(data));
     const items = Planner.dayItems(this.selectedDate, data);
+    this.renderWelcome(wrap, data);
     this.renderMissed(wrap, data);
     this.renderRituals(wrap, items, data);
     wrap.appendChild(this.renderSummary(items, s, data));
@@ -40,34 +41,28 @@ const CalendarView = {
   },
 
   // ---------- Kopf, Schnelleingabe ----------
-  renderHeader() {
+  renderHeader(holiday) {
     const d = new Date(this.selectedDate + 'T00:00:00');
     const isToday = this.selectedDate === this.today();
-    return App.el('div', { style: 'margin-bottom:12px' }, [
-      App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:10px' }, [
-        App.el('div', {}, [
-          App.el('div', { style: 'font-size:19px;font-weight:800' }, isToday ? 'Heute' : d.toLocaleDateString('de-DE', { weekday: 'long' })),
-          App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })),
+    const seg = (key, label) => App.el('button', { class: this.mode === key ? 'active' : '', onclick: () => { this.mode = key; this._scrolled = false; App.refresh(); } }, label);
+    return App.el('div', { class: 'cal-head' }, [
+      App.el('div', { style: 'min-width:0' }, [
+        App.el('div', { class: 'row', style: 'gap:8px' }, [
+          App.el('div', { class: 'today-greet' }, isToday ? 'Heute' : d.toLocaleDateString('de-DE', { weekday: 'long' })),
+          !isToday ? App.el('button', { class: 'pill active', style: 'border:none;cursor:pointer', onclick: () => { this.selectedDate = this.today(); App.refresh(); } }, 'Heute') : null,
         ]),
-        App.el('div', { class: 'row', style: 'gap:6px' }, [
-          !isToday ? App.el('button', { class: 'btn secondary', style: 'width:auto;padding:8px 14px', onclick: () => { this.selectedDate = this.today(); App.refresh(); } }, 'Heute') : null,
-          App.el('button', { class: 'icon-btn', html: Icons.planen(), title: 'Monat', onclick: () => this.openMonth() }),
-        ]),
+        App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) + (holiday ? ` · ${holiday}` : '')),
       ]),
-      App.el('div', { class: 'fab-row', style: 'margin-bottom:0' }, [
-        this.modeBtn('day', 'Tag'),
-        this.modeBtn('week', 'Woche'),
+      App.el('div', { class: 'row', style: 'gap:6px' }, [
+        App.el('div', { class: 'seg' }, [seg('day', 'Tag'), seg('week', 'Woche')]),
+        App.el('button', { class: 'icon-btn', html: Icons.planen(), title: 'Monat', onclick: () => this.openMonth() }),
       ]),
     ]);
   },
 
-  modeBtn(key, label) {
-    return App.el('button', { class: 'btn secondary' + (this.mode === key ? ' selected' : ''), onclick: () => { this.mode = key; this._scrolled = false; App.refresh(); } }, label);
-  },
-
   renderQuickAdd() {
-    const input = App.el('input', { type: 'text', placeholder: 'Neu: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done' });
-    const hint = App.el('div', { class: 'tag', style: 'margin:6px 2px 0;min-height:16px' });
+    const input = App.el('input', { type: 'text', placeholder: 'Neu: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done', style: 'padding-right:48px' });
+    const hint = App.el('div', { class: 'tag', style: 'margin:6px 2px 0;display:none' });
     const submit = async () => {
       const p = Planner.parseQuick(input.value);
       if (!p.title) return;
@@ -76,12 +71,13 @@ const CalendarView = {
     input.addEventListener('input', () => {
       const p = Planner.parseQuick(input.value);
       hint.textContent = p.title ? Planner.describeQuick(p) : '';
+      hint.style.display = p.title ? '' : 'none';
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    return App.el('div', { style: 'margin-bottom:14px' }, [
-      App.el('div', { class: 'row' }, [
-        App.el('div', { style: 'flex:1' }, [input]),
-        App.el('button', { class: 'icon-btn', style: 'color:var(--accent)', html: Icons.plus(), title: 'Hinzufügen', onclick: submit }),
+    return App.el('div', { style: 'margin-bottom:12px' }, [
+      App.el('div', { style: 'position:relative' }, [
+        input,
+        App.el('button', { class: 'icon-btn', style: 'position:absolute;right:4px;top:50%;transform:translateY(-50%);color:var(--accent)', html: Icons.plus(), title: 'Hinzufügen', onclick: submit }),
       ]),
       hint,
     ]);
@@ -124,15 +120,56 @@ const CalendarView = {
     return App.el('div', { class: 'date-strip' }, cells);
   },
 
+  // Monatsauswahl; Tipp auf den Monatsnamen öffnet die Jahresübersicht mit Auslastung pro Tag.
   openMonth() {
     const view = new Date(this.selectedDate + 'T00:00:00');
     view.setDate(1);
+    let yearMode = false;
     const container = App.el('div');
     App.showModal(App.el('div', {}, [container]));
 
+    const head = (title, onPrev, onNext, onTitle) => {
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:16px' }, [
+        App.el('h3', { style: 'margin:0' }, yearMode ? 'Jahresübersicht' : 'Datum wählen'),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => App.closeModal() }),
+      ]));
+      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
+        App.el('button', { class: 'icon-btn', style: 'transform:scaleX(-1)', html: Icons.arrowRight(), onclick: onPrev }),
+        App.el('button', { style: 'background:none;border:none;font-weight:800;font-size:15px;cursor:pointer;color:var(--text)', title: 'Ansicht wechseln', onclick: onTitle }, title),
+        App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: onNext }),
+      ]));
+    };
+
     const draw = async () => {
       const data = await Planner.load();
+      container.innerHTML = '';
       const year = view.getFullYear(), month = view.getMonth();
+
+      if (yearMode) {
+        head(String(year), () => { view.setFullYear(year - 1); draw(); }, () => { view.setFullYear(year + 1); draw(); }, () => { yearMode = false; draw(); });
+        const capacity = Math.max(60, data.s.end - data.s.start);
+        const grid = App.el('div', { class: 'year-grid' });
+        for (let m = 0; m < 12; m++) {
+          const first = new Date(year, m, 1);
+          const offset = (first.getDay() + 6) % 7;
+          const days = new Date(year, m + 1, 0).getDate();
+          const cells = App.el('div', { class: 'year-cells' });
+          for (let i = 0; i < offset; i++) cells.appendChild(App.el('span', { class: 'yc' }));
+          for (let d = 1; d <= days; d++) {
+            const ds = App.todayStr(new Date(year, m, d));
+            const load = Planner.loadMinutes(Planner.dayItems(ds, data));
+            const lvl = load === 0 ? 0 : load > capacity ? 4 : Math.min(3, Math.ceil((load / capacity) * 3));
+            cells.appendChild(App.el('span', { class: `yc l${lvl}` + (ds === this.today() ? ' today' : '') + (ds === this.selectedDate ? ' sel' : '') + (Holidays.name(ds, data.s.holidays) ? ' hol' : ''), title: Holidays.name(ds, data.s.holidays) || '' }));
+          }
+          grid.appendChild(App.el('div', { class: 'year-month' + (m === month ? ' current' : ''), onclick: () => { view.setMonth(m); yearMode = false; draw(); } }, [
+            App.el('div', { class: 'year-name' }, first.toLocaleDateString('de-DE', { month: 'short' })),
+            cells,
+          ]));
+        }
+        container.appendChild(grid);
+        return;
+      }
+
       const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const grid = App.el('div', { class: 'cal-grid' });
@@ -146,22 +183,33 @@ const CalendarView = {
           onclick: () => { this.selectedDate = dateStr; App.closeModal(); App.refresh(); },
         }, [App.el('span', {}, String(day)), busy ? App.el('span', { class: 'cal-dot' }) : null]));
       }
-      container.innerHTML = '';
-      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:16px' }, [
-        App.el('h3', { style: 'margin:0' }, 'Datum wählen'),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => App.closeModal() }),
-      ]));
-      container.appendChild(App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
-        App.el('button', { class: 'icon-btn', style: 'transform:scaleX(-1)', html: Icons.arrowRight(), onclick: () => { view.setMonth(view.getMonth() - 1); draw(); } }),
-        App.el('div', { style: 'font-weight:800' }, view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })),
-        App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: () => { view.setMonth(view.getMonth() + 1); draw(); } }),
-      ]));
+      head(view.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }), () => { view.setMonth(month - 1); draw(); }, () => { view.setMonth(month + 1); draw(); }, () => { yearMode = true; draw(); });
       container.appendChild(grid);
+      container.appendChild(App.el('div', { class: 'tag', style: 'text-align:center;margin-top:12px' }, 'Tipp auf den Monat für die Jahresübersicht'));
     };
     draw();
   },
 
   // ---------- Hinweise ----------
+  // Kurzer Einstieg, solange kaum Daten da sind – einmal wegklickbar.
+  renderWelcome(wrap, data) {
+    let hidden = false;
+    try { hidden = localStorage.getItem('hintCalendar') === '1'; } catch (e) {}
+    if (hidden || data.events.length + data.tasks.length >= 3) return;
+    const card = App.el('div', { class: 'card', style: 'padding:14px' }, [
+      App.el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-start' }, [
+        App.el('div', { style: 'font-weight:800;margin-bottom:6px' }, 'So planst du in 3 Schritten'),
+        App.el('button', { class: 'icon-btn', html: Icons.close(), 'aria-label': 'Schließen', onclick: () => { try { localStorage.setItem('hintCalendar', '1'); } catch (e) {} card.remove(); } }),
+      ]),
+      App.el('div', { class: 'tag', style: 'line-height:1.6' }, [
+        '1. Oben tippen: „Zahnarzt Do 15 Uhr 1h“ oder „Steuer morgen 45min“.', App.el('br'),
+        '2. Aufgaben ohne Zeit landen in der Inbox – „Tag planen“ verteilt sie auf freie Zeit.', App.el('br'),
+        '3. Blöcke lang drücken und ziehen, um sie zu verschieben.',
+      ]),
+    ]);
+    wrap.appendChild(card);
+  },
+
   renderMissed(wrap, data) {
     const missed = Planner.missed(data.tasks);
     if (missed.length === 0) return;
@@ -200,8 +248,8 @@ const CalendarView = {
   // ---------- Timeline ----------
   renderTimeline(items, s) {
     const PX = this.PX_PER_HOUR / 60;
-    const startH = Math.min(6, Math.floor(Math.min(s.start, ...items.map((i) => i.start)) / 60));
-    const endH = Math.max(22, Math.ceil(Math.max(s.end, ...items.map((i) => i.end)) / 60));
+    const startH = Math.max(0, Math.floor((Math.min(s.start, ...items.map((i) => i.start)) - 60) / 60));
+    const endH = Math.min(24, Math.ceil((Math.max(s.end, ...items.map((i) => i.end)) + 60) / 60));
     const top = (min) => (min - startH * 60) * PX;
 
     const tl = App.el('div', { class: 'timeline', style: `height:${(endH - startH) * this.PX_PER_HOUR}px` });
@@ -234,7 +282,7 @@ const CalendarView = {
 
     for (const it of items) {
       const h = Math.max(24, (it.end - it.start) * PX - 2);
-      const cls = 'tl-block ' + it.kind + (it.done ? ' done' : '') + (it.priority === 'high' ? ' high' : '');
+      const cls = 'tl-block ' + it.kind + (it.done ? ' done' : '') + (it.priority === 'high' ? ' high' : '') + (h >= 48 ? ' tall' : '');
       const block = App.el('div', {
         class: cls,
         style: `top:${top(it.start)}px;height:${h}px;left:calc(${(it.col / it.cols) * 100}% + 2px);width:calc(${100 / it.cols}% - 4px)`,
@@ -253,6 +301,7 @@ const CalendarView = {
           h >= 40 ? App.el('div', { class: 'tl-time' }, `${Planner.fmt(it.start)}–${Planner.fmt(it.end)}`) : null,
         ]),
       ]);
+      if (it.type !== 'habit') this.makeDraggable(block, it, PX);
       surface.appendChild(block);
     }
     tl.appendChild(surface);
@@ -266,13 +315,124 @@ const CalendarView = {
       }
     }
 
-    const card = App.el('div', { class: 'card', style: 'padding:12px 12px 12px 8px;overflow:hidden' }, [tl]);
-    if (!this._scrolled) {
-      this._scrolled = true;
-      const anchor = nowLine || surface.querySelector('.tl-block');
-      if (anchor) setTimeout(() => anchor.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
-    }
+    // Eigener Scrollbereich: die Seite bleibt oben stehen, nur die Uhrzeiten scrollen.
+    const scroller = App.el('div', { class: 'tl-scroll' }, [tl]);
+    const card = App.el('div', { class: 'card', style: 'padding:12px 12px 12px 8px;overflow:hidden' }, [scroller]);
+    scroller.addEventListener('scroll', () => { this._tlScroll = scroller.scrollTop; }, { passive: true });
+    const anchor = nowLine || surface.querySelector('.tl-block');
+    setTimeout(() => {
+      if (this._scrollDate === this.selectedDate && this._tlScroll != null) scroller.scrollTop = this._tlScroll;
+      else if (anchor) scroller.scrollTop = Math.max(0, anchor.offsetTop - scroller.clientHeight / 3);
+      this._scrollDate = this.selectedDate;
+    }, 30);
     return card;
+  },
+
+  // ---------- Wochenansicht: Block auf anderen Tag ziehen ----------
+  makeWeekDraggable(row, it, fromDate) {
+    if (it.type === 'habit') return;
+    let timer = null, drag = false, x0 = 0, y0 = 0, target = null, active = false;
+    const clear = () => document.querySelectorAll('.week-day.drop').forEach((c) => c.classList.remove('drop'));
+    const activate = () => { drag = true; row.classList.add('dragging-week'); if (navigator.vibrate) navigator.vibrate(12); };
+    row.addEventListener('pointerdown', (e) => {
+      x0 = e.clientX; y0 = e.clientY; drag = false; active = true; target = null;
+      row.setPointerCapture(e.pointerId);
+      if (e.pointerType !== 'mouse') timer = setTimeout(activate, 350);
+    });
+    row.addEventListener('pointermove', (e) => {
+      if (!active) return;
+      if (!drag) {
+        if (Math.hypot(e.clientX - x0, e.clientY - y0) <= 8) return;
+        if (e.pointerType === 'mouse') activate();
+        else { clearTimeout(timer); active = false; return; }
+      }
+      row.style.transform = `translate(${e.clientX - x0}px, ${e.clientY - y0}px)`;
+      clear();
+      const hit = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList && el.classList.contains('week-day'));
+      target = hit ? hit.dataset.date : null;
+      if (hit && target !== fromDate) hit.classList.add('drop');
+    });
+    const end = async (commit) => {
+      clearTimeout(timer);
+      if (!active) return;
+      active = false;
+      clear();
+      row.style.transform = '';
+      row.classList.remove('dragging-week');
+      if (!drag) return;
+      row._suppress = true;
+      if (!commit || !target || target === fromDate) return;
+      if (it.type === 'event') {
+        if ((it.ref.repeat || 'none') !== 'none') { Planner.toast('Serientermine bitte im Editor verschieben.'); return; }
+        it.ref.date = target;
+        await DB.put('events', it.ref);
+      } else {
+        it.ref.planDate = target;
+        it.ref.updatedAt = Date.now();
+        await DB.put('tasks', it.ref);
+      }
+      App.refresh();
+    };
+    row.addEventListener('pointerup', () => end(true));
+    row.addEventListener('pointercancel', () => end(false));
+    row.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+    row.addEventListener('click', (e) => { if (row._suppress) { e.stopPropagation(); e.preventDefault(); row._suppress = false; } }, true);
+  },
+
+  // ---------- Verschieben & Größe ändern ----------
+  // Langes Drücken (bzw. Ziehen mit der Maus) verschiebt in 15-Minuten-Schritten, der untere Griff ändert die Dauer.
+  makeDraggable(block, it, PX) {
+    const STEP = 15;
+    const handle = App.el('div', { class: 'tl-resize' });
+    block.appendChild(handle);
+    const timeEl = () => block.querySelector('.tl-time');
+    const snap = (dy) => Math.round(dy / PX / STEP) * STEP;
+    let mode = null, y0 = 0, timer = null, moved = false, start = it.start, dur = it.dur, drag = false;
+
+    const label = () => { const t = timeEl(); if (t) t.textContent = `${Planner.fmt(start)}–${Planner.fmt(start + dur)}`; };
+    const finish = async (commit) => {
+      block.classList.remove('dragging');
+      block._suppressClick = drag && moved;
+      if (drag && moved && commit) {
+        const clampStart = Math.max(0, Math.min(start, 1440 - dur));
+        if (it.type === 'event') { it.ref.start = clampStart; it.ref.dur = dur; await DB.put('events', it.ref); }
+        else { it.ref.planDate = this.selectedDate; it.ref.planStart = clampStart; it.ref.duration = dur; it.ref.updatedAt = Date.now(); await DB.put('tasks', it.ref); }
+        this._scrolled = true;
+        App.refresh();
+      }
+      mode = null; drag = false; moved = false;
+    };
+    const begin = (m, e) => {
+      mode = m; y0 = e.clientY; start = it.start; dur = it.dur; moved = false; drag = false;
+      const go = () => { drag = true; block.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); };
+      if (m === 'resize') go(); else if (e.pointerType === 'mouse') { /* Maus: Ziehen genügt */ } else timer = setTimeout(go, 350);
+    };
+
+    handle.addEventListener('pointerdown', (e) => { e.stopPropagation(); block.setPointerCapture(e.pointerId); begin('resize', e); });
+    block.addEventListener('pointerdown', (e) => {
+      if (e.target === handle || e.target.closest('.checkbox')) return;
+      block.setPointerCapture(e.pointerId);
+      begin('move', e);
+    });
+    block.addEventListener('pointermove', (e) => {
+      if (!mode) return;
+      const dy = e.clientY - y0;
+      if (!drag) {
+        if (Math.abs(dy) > 8) { if (e.pointerType === 'mouse' && mode === 'move') { drag = true; block.classList.add('dragging'); } else { clearTimeout(timer); mode = null; } }
+        if (!drag) return;
+      }
+      const d = snap(dy);
+      if (mode === 'move') { start = it.start + d; block.style.transform = `translateY(${d * PX}px)`; }
+      else { dur = Math.max(STEP, it.dur + d); block.style.height = `${Math.max(24, dur * PX - 2)}px`; }
+      moved = moved || d !== 0;
+      label();
+    });
+    const end = (commit) => (e) => { clearTimeout(timer); if (mode) finish(commit); };
+    block.addEventListener('pointerup', end(true));
+    block.addEventListener('pointercancel', end(false));
+    // Solange gezogen wird, darf die Seite nicht scrollen
+    block.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+    block.addEventListener('click', (e) => { if (block._suppressClick) { e.stopImmediatePropagation(); e.preventDefault(); block._suppressClick = false; } }, true);
   },
 
   // ---------- Morgen-Überblick / Tagesabschluss ----------
@@ -314,7 +474,7 @@ const CalendarView = {
           App.el('div', { style: 'font-weight:800;margin-bottom:2px' }, title),
           ...lines.filter(Boolean).map((l) => App.el('div', { class: 'tag' }, l)),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => { Planner.dismissRitual(key); card.remove(); } }),
+        App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => { Planner.dismissRitual(key); card.remove(); } }),
       ]),
     ]);
     if (action) card.appendChild(App.el('button', { class: 'btn', style: 'margin:10px 0 0', onclick: action.fn }, action.label));
@@ -332,17 +492,16 @@ const CalendarView = {
       return card;
     }
     const today = this.today();
-    const list = App.el('div', { class: 'list' });
+    const list = App.el('div', { class: 'line-list' });
     for (const t of tasks.slice(0, 8)) {
       const overdue = t.dueDate && t.dueDate < today;
-      list.appendChild(App.el('div', { class: 'item' }, [
-        App.el('div', { style: 'flex:1;cursor:pointer;min-width:0', onclick: () => TasksView.openEditor(t) }, [
+      list.appendChild(App.el('div', { class: 'line' }, [
+        App.el('span', { class: 'line-dot' }),
+        App.el('div', { class: 'line-main', style: 'cursor:pointer', onclick: () => TasksView.openEditor(t) }, [
           App.el('div', { class: 'item-title' }, t.title),
-          App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, [
-            t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
-            App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration || 30)),
-          ]),
+          App.el('div', { class: 'tag' }, [Planner.fmtDur(t.duration || 30), t.dueDate ? ` · fällig ${App.formatDate(t.dueDate).slice(0, 6)}` : ''].join('')),
         ]),
+        overdue ? App.el('span', { class: 'pill overdue' }, 'überfällig') : null,
         App.el('button', {
           class: 'icon-btn', style: 'color:var(--accent)', html: Icons.planen(), title: 'Einplanen',
           onclick: async () => {
@@ -406,7 +565,6 @@ const CalendarView = {
       App.el('div', { style: 'font-weight:800' }, `${fmtShort(start)} – ${fmtShort(last)}`),
       App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: () => { this.selectedDate = Planner.addDays(start, 7); App.refresh(); } }),
     ]));
-    wrap.appendChild(this.renderReview(start, last, data));
     const capacity = s.end - s.start;
     for (let i = 0; i < 7; i++) {
       const ds = Planner.addDays(start, i);
@@ -415,28 +573,39 @@ const CalendarView = {
       const load = Planner.loadMinutes(items);
       const pct = Math.min(100, Math.round((load / capacity) * 100));
       const isToday = ds === this.today();
+      const empty = items.length === 0;
       const card = App.el('div', {
-        class: 'card week-day' + (isToday ? ' today' : ''),
-        style: 'cursor:pointer;padding:12px 14px',
+        class: 'card week-day' + (isToday ? ' today' : '') + (empty ? ' empty-day' : ''),
+        'data-date': ds,
+        style: 'cursor:pointer;padding:' + (empty ? '11px 14px' : '12px 14px'),
         onclick: () => { this.selectedDate = ds; this.mode = 'day'; this._scrolled = false; App.refresh(); },
       }, [
-        App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
-          App.el('div', { style: 'font-weight:800' }, d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })),
-          load > capacity ? App.el('span', { class: 'pill overdue' }, 'Überlastet') : App.el('span', { class: 'tag' }, load ? Planner.fmtDur(load) : ''),
+        App.el('div', { class: 'row', style: 'justify-content:space-between' }, [
+          App.el('div', { class: 'row', style: 'gap:8px' }, [
+            App.el('div', { style: 'font-weight:800' + (empty ? ';color:var(--text-dim)' : '') }, d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })),
+            isToday ? App.el('span', { class: 'pill active' }, 'Heute') : null,
+            Holidays.name(ds, s.holidays) ? App.el('span', { class: 'pill', style: 'background:rgba(var(--warn-rgb),.18);color:var(--warn)' }, Holidays.name(ds, s.holidays)) : null,
+          ]),
+          load > capacity ? App.el('span', { class: 'pill overdue' }, 'Überlastet') : App.el('span', { class: 'tag' }, empty ? 'frei' : Planner.fmtDur(load)),
         ]),
-        App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill' + (load > capacity ? ' over' : ''), style: `width:${pct}%` })]),
+        empty ? null : App.el('div', { class: 'load-bar', style: 'margin-top:8px' }, [App.el('div', { class: 'load-fill' + (load > capacity ? ' over' : ''), style: `width:${pct}%` })]),
       ]);
       if (items.length) {
         const list = App.el('div', { style: 'margin-top:10px;display:flex;flex-direction:column;gap:4px' });
-        items.slice(0, 4).forEach((it) => list.appendChild(App.el('div', { class: 'week-item' + (it.done ? ' done' : '') }, [
-          App.el('span', { class: 'week-time' }, Planner.fmt(it.start)),
-          App.el('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.title),
-        ])));
+        items.slice(0, 4).forEach((it) => {
+          const row = App.el('div', { class: 'week-item' + (it.done ? ' done' : '') }, [
+            App.el('span', { class: 'week-time' }, Planner.fmt(it.start)),
+            App.el('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.title),
+          ]);
+          this.makeWeekDraggable(row, it, ds);
+          list.appendChild(row);
+        });
         if (items.length > 4) list.appendChild(App.el('div', { class: 'tag' }, `+ ${items.length - 4} weitere`));
         card.appendChild(list);
       }
       wrap.appendChild(card);
     }
+    wrap.appendChild(this.renderReview(start, last, data));
     return wrap;
   },
 
@@ -454,8 +623,8 @@ const CalendarView = {
       let plannedMin = 0;
       for (let i = 0; i < 7; i++) plannedMin += Planner.loadMinutes(Planner.dayItems(Planner.addDays(start, i), data));
       const factor = Planner.estimateFactor(data.tasks);
-      const stat = (n, l) => App.el('div', { class: 'stat', style: 'flex:1 1 calc(50% - 5px)' }, [App.el('div', { class: 'num' }, String(n)), App.el('div', { class: 'lbl' }, l)]);
-      card.appendChild(App.el('div', { class: 'stat-row' }, [
+      const stat = (n, l) => App.el('div', { class: 'mini' }, [App.el('div', { class: 'mini-num' }, String(n)), App.el('div', { class: 'mini-lbl' }, l)]);
+      card.appendChild(App.el('div', { class: 'mini-row' }, [
         stat(doneTasks.length, 'Erledigt'), stat(focusMin, 'Fokus-Min'), stat(habitDays, 'Routinen'), stat(Math.round(plannedMin / 60 * 10) / 10, 'Std. geplant'),
       ]));
       if (Math.abs(factor - 1) > 0.15) {
@@ -503,6 +672,22 @@ const CalendarView = {
       App.el('option', { value: '10' }, '10 Minuten vorher'), App.el('option', { value: '30' }, '30 Minuten vorher'), App.el('option', { value: '60' }, '1 Stunde vorher'),
     ]);
     remindSelect.value = e.remind == null ? '' : String(e.remind);
+    const untilInput = App.el('input', { type: 'date', value: e.until || '' });
+    const untilField = App.el('div', { class: 'field', style: (e.repeat || 'none') === 'none' ? 'display:none' : '' }, [App.el('label', {}, 'Wiederholen bis (optional)'), untilInput]);
+    repeatSelect.addEventListener('change', () => { untilField.style.display = repeatSelect.value === 'none' ? 'none' : ''; });
+
+    // Hinweis bei Überschneidung mit anderen Blöcken (rein informativ)
+    const conflict = App.el('div', { class: 'tag', style: 'color:var(--warn);margin:-4px 0 12px;display:none' });
+    let cdata = null;
+    const checkConflict = () => {
+      if (!cdata) return;
+      const start = Planner.parseTime(timeInput.value), end = start + Number(durSelect.value);
+      const clash = Planner.dayItems(dateInput.value || e.date, cdata).find((i) => !(i.id === e.id && i.type === 'event') && i.start < end && i.end > start);
+      conflict.textContent = clash ? `Überschneidet sich mit „${clash.title}“ (${Planner.fmt(clash.start)}–${Planner.fmt(clash.end)}).` : '';
+      conflict.style.display = clash ? '' : 'none';
+    };
+    [dateInput, timeInput, durSelect].forEach((el) => el.addEventListener('change', checkConflict));
+    Planner.load().then((d) => { cdata = d; checkConflict(); });
 
     const save = async () => {
       e.title = titleInput.value.trim();
@@ -513,6 +698,7 @@ const CalendarView = {
       e.kind = kindSelect.value;
       e.level = levelSelect.value;
       e.repeat = repeatSelect.value;
+      e.until = e.repeat === 'none' ? '' : untilInput.value;
       e.remind = remindSelect.value === '' ? null : Number(remindSelect.value);
       if (e.start + e.dur > 1440) e.dur = 1440 - e.start;
       await DB.put('events', e);
@@ -528,10 +714,12 @@ const CalendarView = {
     if (!isNew) {
       const recurring = (e.repeat || 'none') !== 'none';
       const del = async (onlyThisDay) => {
+        const before = ev ? { ...ev, skip: [...(ev.skip || [])] } : null;
         if (onlyThisDay) { e.skip = [...(e.skip || []), this.selectedDate]; await DB.put('events', e); }
         else await DB.delete('events', e.id);
         App.closeModal();
         App.refresh();
+        Planner.toast(onlyThisDay ? 'Für diesen Tag gelöscht.' : 'Termin gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('events', before); App.refresh(); } });
       };
       const extra = [];
       if (e.kind === 'focus') {
@@ -557,7 +745,9 @@ const CalendarView = {
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Beginn'), timeInput]),
         App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Dauer'), durSelect]),
       ]),
+      conflict,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Wiederholung'), repeatSelect]),
+      untilField,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Erinnerung'), remindSelect]),
       ...buttons,
     ]));

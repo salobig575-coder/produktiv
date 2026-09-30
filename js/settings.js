@@ -49,6 +49,9 @@ const SettingsView = {
     const endInput = App.el('input', { type: 'time', value: Planner.fmt(ps.end) });
     startInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerStart', value: Planner.parseTime(startInput.value) }); });
     endInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerEnd', value: Planner.parseTime(endInput.value) }); });
+    const holSelect = App.el('select', {}, Object.entries(Holidays.STATES).map(([k, l]) => App.el('option', { value: k }, l)));
+    holSelect.value = ps.holidays || '';
+    holSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'holidayState', value: e.target.value }); });
     const bufferSelect = App.el('select', {}, [0, 5, 10, 15, 30].map((m) => App.el('option', { value: m }, m ? `${m} Minuten` : 'Kein Puffer')));
     bufferSelect.value = String(ps.buffer);
     bufferSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'plannerBuffer', value: Number(e.target.value) }); });
@@ -119,6 +122,7 @@ const SettingsView = {
           App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Tag endet'), endInput]),
         ]),
         App.el('div', { class: 'field' }, [App.el('label', {}, 'Puffer zwischen Blöcken'), bufferSelect, App.el('p', { class: 'tag', style: 'margin-top:4px' }, 'Die automatische Planung nutzt nur Zeit innerhalb dieses Fensters.')]),
+        App.el('div', { class: 'field' }, [App.el('label', {}, 'Feiertage anzeigen'), holSelect]),
         App.switchRow('Erinnerungen', 'Hinweis vor Terminen, solange Produktiv geöffnet ist. Benachrichtigungen des Browsers werden zusätzlich genutzt, falls erlaubt.', ps.reminders, async (val) => {
           await DB.put('settings', { key: 'remindersEnabled', value: val });
           if (val && Native.isNative()) await Native.requestNotifications();
@@ -205,6 +209,7 @@ const SettingsView = {
   },
 
   async exportFile() {
+    try { localStorage.setItem('lastBackup', String(Date.now())); } catch (e) {}
     const payload = await DB.exportAll();
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

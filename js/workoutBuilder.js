@@ -37,7 +37,7 @@ const WorkoutCategories = {
       for (const cat of cats) {
         list.appendChild(App.el('div', { class: 'item' }, [
           App.el('div', { style: 'flex:1' }, cat),
-          App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: async () => { await this.remove(cat); onChange(); renderBody(); } }),
+          App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: async () => { await this.remove(cat); onChange(); renderBody(); } }),
         ]));
       }
       const nameInput = App.el('input', { type: 'text', placeholder: 'Neue Kategorie, z.B. Beine' });
@@ -115,7 +115,7 @@ const WorkoutsView = {
           ]),
           w.tag ? App.el('span', { class: 'pill' }, w.tag) : null,
           App.el('button', { class: 'icon-btn', html: Icons.copy(), title: 'Duplizieren', onclick: () => this.duplicate(w) }),
-          App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(w, e) }),
+          App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: (e) => this.remove(w, e) }),
         ]),
         typeof WorkoutSessionView !== 'undefined' ? App.el('button', { class: 'btn', onclick: () => WorkoutSessionView.start(w) }, [
           'Workout starten', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
@@ -373,7 +373,7 @@ const WorkoutsView = {
       const controls = App.el('div', { class: 'row', style: 'gap:6px;padding-top:4px;border-top:1px solid var(--border)' }, [
         App.el('button', { class: 'btn secondary', style: 'flex:1;padding:8px', onclick: () => { if (i > 0) { [w.exercises[i - 1], w.exercises[i]] = [w.exercises[i], w.exercises[i - 1]]; renderBody(); } } }, [App.el('span', { html: Icons.chevronUp(), style: 'width:16px;height:16px' }), 'Hoch']),
         App.el('button', { class: 'btn secondary', style: 'flex:1;padding:8px', onclick: () => { if (i < w.exercises.length - 1) { [w.exercises[i + 1], w.exercises[i]] = [w.exercises[i], w.exercises[i + 1]]; renderBody(); } } }, [App.el('span', { html: Icons.chevronDown(), style: 'width:16px;height:16px' }), 'Runter']),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: () => { w.exercises.splice(i, 1); expanded.delete(i); renderBody(); } }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: () => { w.exercises.splice(i, 1); expanded.delete(i); renderBody(); } }),
       ]);
       item.appendChild(controls);
       item.appendChild(App.el('button', {
@@ -418,7 +418,7 @@ const WorkoutsView = {
             onclick: () => { set.warmup = !set.warmup; renderBody(); },
           }));
         }
-        row.push(App.el('button', { class: 'icon-btn', html: Icons.close(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }));
+        row.push(App.el('button', { class: 'icon-btn', title: 'Schließen', html: Icons.close(), onclick: () => { entry.sets.splice(si, 1); renderBody(); } }));
         setsBox.appendChild(App.el('div', { class: 'set-row', style: gridStyle }, row));
       });
       item.appendChild(setsBox);

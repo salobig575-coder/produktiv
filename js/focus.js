@@ -60,19 +60,26 @@ const FocusView = {
     wrap.appendChild(ringWrap);
 
     if (s.intention && s.running) {
-      wrap.appendChild(App.el('div', { class: 'tag', style: 'text-align:center;margin-bottom:12px' }, `Absicht: ${s.intention}`));
+      wrap.appendChild(App.el('div', { class: 'tag', style: 'text-align:center;margin:-6px 0 12px' }, `Absicht: ${s.intention}`));
     }
 
     const locked = s.running && s.mode === 'focus' && s.level === 'strict';
-    wrap.appendChild(App.el('div', { class: 'timer-controls' }, [
+    const controls = App.el('div', { class: 'timer-controls' }, [
       App.el('button', {
         class: 'btn', id: 'toggleBtn', disabled: locked,
         onclick: () => this.toggle(),
       }, locked ? 'Gesperrt' : (s.running ? 'Pause' : 'Start')),
       App.el('button', { class: 'btn secondary', id: 'resetBtn', disabled: locked, onclick: () => this.guarded(() => this.reset()) }, 'Zurücksetzen'),
-    ]));
+    ]);
 
-    if (!s.running) {
+    if (s.running) {
+      wrap.appendChild(controls);
+    } else {
+      // Erst einstellen, dann starten: Dauer, Absicht, Härtegrad – der Start-Knopf steht darunter.
+      wrap.appendChild(App.el('div', { class: 'row', style: 'justify-content:center;gap:16px;margin-bottom:16px' }, [
+        this.durationPicker('focusMin', 'Fokus (Min)'),
+        this.durationPicker('breakMin', 'Pause (Min)'),
+      ]));
       const intentInput = App.el('input', { type: 'text', value: s.intention, placeholder: 'Woran arbeitest du? (optional)' });
       intentInput.addEventListener('input', () => { s.intention = intentInput.value; if (s.taskId) s.taskId = null; });
       wrap.appendChild(App.el('div', { class: 'field' }, [App.el('label', {}, 'Absicht'), intentInput]));
@@ -84,13 +91,7 @@ const FocusView = {
         }, l.label))),
         App.el('div', { class: 'tag' }, this.LEVELS.find((l) => l.key === s.level).desc),
       ]));
-    }
-
-    if (!s.running) {
-      wrap.appendChild(App.el('div', { class: 'row', style: 'justify-content:center;gap:16px;margin-bottom:16px' }, [
-        this.durationPicker('focusMin', 'Fokus (Min)'),
-        this.durationPicker('breakMin', 'Pause (Min)'),
-      ]));
+      wrap.appendChild(controls);
     }
 
     const today = App.todayStr();
@@ -185,6 +186,7 @@ const FocusView = {
     if (!s.sessionStart) { s.sessionStart = Date.now(); s.attempts = 0; }
     s.stopAt = null;
     s.running = true;
+    s.endAt = Date.now() + s.remaining * 1000; // Zeitstempel statt Sekundenzählen: stimmt auch, wenn die App im Hintergrund schläft
     window.onbeforeunload = s.level === 'strict' && s.mode === 'focus' ? (e) => { e.preventDefault(); e.returnValue = ''; } : null;
     clearInterval(s.intervalId);
     s.intervalId = setInterval(() => this.tick(), 1000);
@@ -221,7 +223,7 @@ const FocusView = {
 
   async tick() {
     const s = this.state;
-    s.remaining -= 1;
+    s.remaining = Math.max(0, Math.round((s.endAt - Date.now()) / 1000));
     const display = document.getElementById('timerDisplay');
     if (display) display.textContent = this.fmt(Math.max(0, s.remaining));
     this.updateRing();
@@ -251,8 +253,14 @@ const FocusView = {
         s.mode = 'focus';
         s.remaining = s.focusMin * 60;
       }
+      s.endAt = Date.now() + s.remaining * 1000;
       s.sessionStart = Date.now();
       if (App.current === 'focus') App.refresh();
     }
   },
 };
+
+// Nach dem Zurückkehren in die App sofort den korrekten Stand anzeigen
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && FocusView.state.running) FocusView.tick();
+});

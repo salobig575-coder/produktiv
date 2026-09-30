@@ -211,7 +211,7 @@ const Gyms = {
         list.appendChild(App.el('div', { class: 'item', style: 'flex-direction:column;align-items:stretch;gap:8px' }, [
           App.el('div', { class: 'row', style: 'justify-content:space-between' }, [
             App.el('div', { class: 'item-title' }, gym.name),
-            App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: async () => { await this.remove(gym.id); renderBody(); } }),
+            App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: async () => { await this.remove(gym.id); renderBody(); } }),
           ]),
           App.el('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' }, (gym.equipment || []).map((eq) =>
             App.el('span', { class: 'pill', style: 'cursor:pointer', title: 'Entfernen', onclick: async () => { await this.removeEquipment(gym.id, eq); renderBody(); } }, eq + ' ×'))),

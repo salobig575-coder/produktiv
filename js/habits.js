@@ -1,8 +1,11 @@
 const HabitsView = {
+  // Eigene Reihenfolge (per Ziehen); neue Gewohnheiten ohne Wert landen hinten.
+  orderOf(h) { return h.order != null ? h.order : h.createdAt; },
+
   async render() {
     const wrap = App.el('div');
     const habits = await DB.getAll('habits');
-    habits.sort((a, b) => a.createdAt - b.createdAt);
+    habits.sort((a, b) => this.orderOf(a) - this.orderOf(b));
     const logs = await DB.getAll('habitLogs');
 
     wrap.appendChild(App.el('button', { class: 'btn', onclick: () => this.openEditor() }, [
@@ -44,18 +47,65 @@ const HabitsView = {
     const list = App.el('div', { class: 'list' });
     for (const h of habits) {
       const streak = this.streak(logs, h.id);
-      list.appendChild(App.el('div', { class: 'item' }, [
+      list.appendChild(App.el('div', { class: 'item', 'data-id': h.id }, [
+        App.el('button', { class: 'grip', html: Icons.grip(), title: 'Reihenfolge ändern' }),
         App.el('span', { html: Icons.habits(), style: `width:20px;height:20px;flex-shrink:0;color:${streak > 0 ? 'var(--warn)' : 'var(--text-dim)'}` }),
         App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(h) }, [
           App.el('div', { class: 'item-title' }, h.name),
-          App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} Tage in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
+          App.el('div', { class: 'item-meta' }, (streak > 0 ? `${streak} ${streak === 1 ? "Tag" : "Tage"} in Folge` : 'Noch keine Serie') + (h.window ? ` · ${Planner.fmt(h.window.from)}–${Planner.fmt(h.window.to)}` : '')),
         ]),
-        App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
+        App.el('button', { class: 'icon-btn', title: 'Löschen', html: Icons.trash(), onclick: (e) => this.remove(h, e) }),
       ]));
     }
     wrap.appendChild(list);
+    if (habits.length > 1) this.makeSortable(list, habits);
 
     return wrap;
+  },
+
+  // Reihenfolge durch Ziehen am Griff ändern
+  makeSortable(list, habits) {
+    list.querySelectorAll('.item[data-id]').forEach((item) => {
+      const grip = item.querySelector('.grip');
+      grip.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        grip.setPointerCapture(e.pointerId);
+        const items = [...list.querySelectorAll('.item[data-id]')];
+        const idx = items.indexOf(item);
+        const rects = items.map((el) => el.getBoundingClientRect());
+        const centers = rects.map((r) => r.top + r.height / 2);
+        const shift = rects[idx].height + 8;
+        const y0 = e.clientY;
+        let target = idx;
+        item.classList.add('dragging-row');
+        const move = (ev) => {
+          const dy = ev.clientY - y0;
+          item.style.transform = `translateY(${dy}px)`;
+          const cur = centers[idx] + dy;
+          target = centers.filter((c, j) => j !== idx && c < cur).length;
+          items.forEach((el, j) => {
+            if (j === idx) return;
+            let t = 0;
+            if (idx < target && j > idx && j <= target) t = -shift;
+            if (idx > target && j < idx && j >= target) t = shift;
+            el.style.transform = t ? `translateY(${t}px)` : '';
+          });
+        };
+        const up = async (ev) => {
+          grip.removeEventListener('pointermove', move);
+          grip.removeEventListener('pointerup', up);
+          grip.removeEventListener('pointercancel', up);
+          if (ev.type === 'pointercancel' || target === idx) { App.refresh(); return; }
+          const order = habits.slice();
+          order.splice(target, 0, order.splice(idx, 1)[0]);
+          for (let i = 0; i < order.length; i++) { order[i].order = i; await DB.put('habits', order[i]); }
+          App.refresh();
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up);
+        grip.addEventListener('pointercancel', up);
+      });
+    });
   },
 
   lastNDays(n) {

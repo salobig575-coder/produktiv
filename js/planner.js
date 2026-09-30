@@ -6,10 +6,10 @@ const Planner = {
   REPEAT_LABEL: { none: 'Einmalig', daily: 'Täglich', weekdays: 'Werktags', weekly: 'Wöchentlich', monthly: 'Monatlich' },
 
   async settings() {
-    const keys = ['plannerStart', 'plannerEnd', 'plannerBuffer', 'remindersEnabled'];
+    const keys = ['plannerStart', 'plannerEnd', 'plannerBuffer', 'remindersEnabled', 'holidayState'];
     const rows = await Promise.all(keys.map((k) => DB.get('settings', k)));
     const v = (r, d) => (r && r.value != null ? r.value : d);
-    return { start: v(rows[0], 8 * 60), end: v(rows[1], 20 * 60), buffer: v(rows[2], 0), reminders: v(rows[3], false) };
+    return { start: v(rows[0], 8 * 60), end: v(rows[1], 20 * 60), buffer: v(rows[2], 0), reminders: v(rows[3], false), holidays: v(rows[4], '') };
   },
 
   fmt(min) {
@@ -44,6 +44,7 @@ const Planner = {
   occursOn(ev, date) {
     if (date < ev.date) return false;
     if (ev.skip && ev.skip.includes(date)) return false;
+    if (ev.until && date > ev.until) return false;
     const r = ev.repeat || 'none';
     if (r === 'none') return ev.date === date;
     const d = new Date(date + 'T00:00:00'), s = new Date(ev.date + 'T00:00:00');
@@ -75,7 +76,7 @@ const Planner = {
   async spawnNext(task) {
     if (!task.repeat || task.repeat === 'none' || task.spawned) return;
     const next = this.nextDue(task.dueDate || App.todayStr(), task.repeat);
-    if (!next) return;
+    if (!next || (task.repeatUntil && next > task.repeatUntil)) return;
     task.spawned = true;
     await DB.put('tasks', task);
     await DB.put('tasks', { ...task, id: DB.uid(), done: false, spawned: false, dueDate: next, planDate: null, planStart: null, createdAt: Date.now(), updatedAt: Date.now() });
@@ -181,6 +182,8 @@ const Planner = {
       return Math.abs(factor - 1) > 0.15 ? Math.ceil((d * factor) / 5) * 5 : d;
     };
     if (Math.abs(factor - 1) > 0.15) notes.push(`Deine Schätzungen liegen im Schnitt ${factor > 1 ? Math.round((factor - 1) * 100) + ' % zu kurz' : Math.round((1 - factor) * 100) + ' % zu lang'} – Dauer angepasst.`);
+    const hol = Holidays.name(date, s.holidays);
+    if (hol) notes.push(`${hol} – Feiertag. Der Vorschlag plant trotzdem ein.`);
     let fill = 0.85;
     if (date === App.todayStr() && data.sleep != null && data.sleep < 6) { fill = 0.6; notes.push(`Nur ${data.sleep} h Schlaf – heute wird etwas weniger eingeplant.`); }
 
@@ -331,34 +334,52 @@ const Planner = {
     this.checkReminders();
   },
 
+  // Alle Erinnerungen eines Tages (Minuten seit Mitternacht): Termine, geplante Aufgaben, Morgen-Hinweis für Fälliges.
+  reminderList(data, date) {
+    const s = data.s, list = [];
+    for (const ev of data.events) {
+      if (ev.remind == null || !this.occursOn(ev, date)) continue;
+      list.push({
+        key: `${ev.id}:${date}`, at: ev.start - ev.remind, until: ev.start + 1,
+        msg: ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`,
+      });
+    }
+    for (const t of data.tasks) {
+      if (t.done || t.planDate !== date || t.planStart == null) continue;
+      list.push({ key: `${t.id}:${date}`, at: t.planStart - 5, until: t.planStart + 1, msg: `${t.title} ist gleich dran (${this.fmt(t.planStart)})` });
+    }
+    const dueCount = data.tasks.filter((t) => !t.done && t.dueDate && (date === App.todayStr() ? t.dueDate <= date : t.dueDate === date)).length;
+    if (dueCount) list.push({ key: `digest:${date}`, at: s.start, until: s.end, msg: dueCount === 1 ? '1 Aufgabe ist heute fällig.' : `${dueCount} Aufgaben sind heute fällig.` });
+    return list;
+  },
+
   async checkReminders() {
-    const s = await this.settings();
-    if (!s.reminders) return;
-    const today = App.todayStr(), now = this.nowMin();
     const data = await this.load();
+    if (!data.s.reminders) return;
+    const today = App.todayStr(), now = this.nowMin();
     let fired = {};
     try { fired = JSON.parse(localStorage.getItem('plannerFired') || '{}'); } catch (e) {}
     for (const k of Object.keys(fired)) if (!k.endsWith(today)) delete fired[k];
-    for (const ev of data.events) {
-      if (ev.remind == null || !this.occursOn(ev, today)) continue;
-      const key = `${ev.id}:${today}`;
-      const at = ev.start - ev.remind;
-      if (fired[key] || now < at || now >= ev.start + 1) continue;
-      fired[key] = 1;
-      const msg = ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`;
-      this.toast(msg);
+    for (const r of this.reminderList(data, today)) {
+      if (fired[r.key] || now < r.at || now >= r.until) continue;
+      fired[r.key] = 1;
+      this.toast(r.msg);
       try {
-        if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: msg, icon: 'icons/icon.svg' });
+        if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: r.msg, icon: 'icons/icon-192.png' });
       } catch (e) {}
     }
     try { localStorage.setItem('plannerFired', JSON.stringify(fired)); } catch (e) {}
   },
 
-  toast(text) {
-    const t = App.el('div', { class: 'toast' }, text);
+  toast(text, action) {
+    const t = App.el('div', { class: 'toast' }, [text]);
+    if (action) {
+      t.appendChild(App.el('button', { class: 'toast-action', onclick: () => { t.remove(); action.fn(); } }, action.label));
+    }
     document.body.appendChild(t);
-    setTimeout(() => t.classList.add('hide'), 4200);
-    setTimeout(() => t.remove(), 4700);
+    const life = action ? 8000 : 4200;
+    setTimeout(() => t.classList.add('hide'), life);
+    setTimeout(() => t.remove(), life + 500);
   },
   // ---------- ICS Export / Import ----------
   ICS_DAYS: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'],
@@ -378,7 +399,7 @@ const Planner = {
       lines.push('END:VEVENT');
     };
     const rr = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
-    data.events.forEach((e) => add(e.id, e.title, e.date, e.start, e.dur, rr[e.repeat], e.skip));
+    data.events.forEach((e) => add(e.id, e.title, e.date, e.start, e.dur, rr[e.repeat] ? rr[e.repeat] + (e.until ? `;UNTIL=${e.until.replace(/-/g, '')}T235959` : '') : null, e.skip));
     data.tasks.filter((t) => t.planStart != null && t.planDate && !t.done).forEach((t) => add(t.id, t.title, t.planDate, t.planStart, t.duration || 30));
     lines.push('END:VCALENDAR');
     return lines.join('\r\n');
@@ -405,7 +426,7 @@ const Planner = {
           events.push({
             id: 'ics-' + (cur.uid || DB.uid()), title: cur.title, date: App.todayStr(cur.start), start: startMin,
             dur: Math.max(15, Math.min(dur, 1440 - startMin)), kind: 'event', repeat: cur.repeat || 'none', remind: null,
-            skip: cur.skip.map((d) => App.todayStr(d)), createdAt: Date.now(),
+            skip: cur.skip.map((d) => App.todayStr(d)), until: cur.until || '', createdAt: Date.now(),
           });
         } else skipped++;
         cur = null; continue;
@@ -421,6 +442,8 @@ const Planner = {
         if (f === 'DAILY') cur.repeat = 'daily';
         else if (f === 'MONTHLY') cur.repeat = 'monthly';
         else if (f === 'WEEKLY') cur.repeat = /BYDAY=MO,TU,WE,TH,FR(?!,)/.test(line) ? 'weekdays' : 'weekly';
+        const u = line.match(/UNTIL=(\d{4})(\d{2})(\d{2})/);
+        if (u) cur.until = `${u[1]}-${u[2]}-${u[3]}`;
       }
     }
     return { events, skipped };
