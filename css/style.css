@@ -1324,3 +1324,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .chip { max-width: 100%; min-width: 0; }
 .chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .chip-dot { flex: none; }
+
+/* Heute: Rekord-Streifen */
+.pr-strip {
+  display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 11px 13px; cursor: pointer;
+  background: rgba(var(--warn-rgb), .13); border-radius: var(--radius-sm);
+}

@@ -41,6 +41,8 @@ const TodayView = {
     ]));
 
     wrap.appendChild(await this.nowCard(today, data));
+    const trainingCard = await this.trainingCard(today);
+    if (trainingCard) wrap.appendChild(trainingCard);
 
     // Eine Karte für alles, was heute noch ansteht: Blöcke, fällige Aufgaben, Gewohnheiten
     const items = Planner.dayItems(today, data).filter((i) => !i.done && i.end > now && !(i.start <= now));
@@ -97,12 +99,37 @@ const TodayView = {
       if (typeof n === 'number' && n > 0) requestAnimationFrame(() => App.animateCounter(num, n, { from: 0, duration: 700 }));
       return App.el('div', { class: 'mini' }, [num, App.el('div', { class: 'mini-lbl' }, l)]);
     };
+    const stepEntry = await StepsTracking.forDate(today);
+    const stepGoal = await StepsTracking.goal();
+    const steps = stepEntry ? stepEntry.steps : 0;
+    const stepPct = stepGoal > 0 ? Math.min(100, Math.round((steps / stepGoal) * 100)) : 0;
+    const pr = this.recentPR(fitSessions);
     wrap.appendChild(App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.bolt(), style: 'width:14px;height:14px' }), 'Fortschritt']),
       App.el('div', { class: 'mini-row' }, [
         mini(streak, 'Tage-Streak'), mini(workoutsThisWeek, 'Workouts'), mini(focusMin, 'Fokus-Min'),
         weightEnabled ? mini(latestWeight ? latestWeight.weight : '–', 'kg') : null,
       ]),
+      // Schritte heute
+      App.el('div', { style: 'margin-top:14px' }, [
+        App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:6px' }, [
+          App.el('div', { style: 'font-weight:800' }, [`${steps.toLocaleString('de-DE')}`, App.el('span', { class: 'tag', style: 'font-weight:600' }, ` / ${stepGoal.toLocaleString('de-DE')} Schritte`)]),
+          App.el('span', { class: 'tag' }, stepEntry ? `${stepPct} %` : 'nicht erfasst'),
+        ]),
+        App.el('div', { class: 'load-bar' }, [App.el('div', { class: 'load-fill', style: `width:${stepPct}%` })]),
+        App.el('div', { class: 'row', style: 'margin-top:10px' }, [
+          App.el('button', { class: 'btn secondary', style: 'flex:1;margin:0;padding:9px 12px', onclick: async () => { await StepsTracking.log(today, steps + 1000); App.refresh(); } }, '+ 1.000'),
+          App.el('button', { class: 'btn secondary', style: 'flex:1;margin:0;padding:9px 12px', onclick: () => StepsTracking.openEntry(today) }, 'Eintragen'),
+        ]),
+      ]),
+      // Letzter Rekord
+      pr ? App.el('div', { class: 'pr-strip', onclick: () => Exercises.showPersonalRecords(pr.id, pr.name) }, [
+        App.el('span', { html: Icons.trophy(), style: 'width:20px;height:20px;flex:none;color:var(--warn)' }),
+        App.el('div', { style: 'min-width:0;flex:1' }, [
+          App.el('div', { style: 'font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, `Neuer Rekord: ${pr.name}`),
+          App.el('div', { class: 'tag' }, `${String(pr.weight).replace('.', ',')} kg × ${pr.reps} · ${this.ago(pr.at)}`),
+        ]),
+      ]) : null,
       App.el('div', { class: 'row', style: 'margin-top:14px' }, [
         App.el('button', { class: 'btn secondary', style: 'flex:1;margin:0', onclick: () => { FitnessHub.activeTab = 'uebersicht'; App.navigate('fitness'); } }, 'Fitness'),
         App.el('button', { class: 'btn secondary', style: 'flex:1;margin:0', onclick: () => { PlanenHub.activeTab = 'focus'; App.navigate('planen'); } }, 'Fokus-Timer'),
@@ -123,6 +150,75 @@ const TodayView = {
     }
 
     return wrap;
+  },
+
+  ago(ts) {
+    const d = Math.round((new Date(App.todayStr()).getTime() - new Date(App.todayStr(new Date(ts))).getTime()) / 86400000);
+    return d <= 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`;
+  },
+
+  // Jüngster Rekord der letzten 14 Tage (geschätztes 1RM höher als alles Bisherige der Übung)
+  recentPR(sessions) {
+    const cutoff = Date.now() - 14 * 86400000;
+    const best = {};
+    let latest = null;
+    for (const sess of sessions.slice().sort((a, b) => a.finishedAt - b.finishedAt)) {
+      for (const ex of sess.exercises || []) {
+        let bestNow = 0, bestSet = null;
+        for (const set of ex.sets || []) {
+          if (!set.completed || set.warmup) continue;
+          const e = Calc.estimatedOneRepMax(set.weight, set.reps);
+          if (e > bestNow) { bestNow = e; bestSet = set; }
+        }
+        const hist = best[ex.exerciseId] || 0;
+        if (bestSet && hist > 0 && bestNow > hist && sess.finishedAt >= cutoff) {
+          latest = { id: ex.exerciseId, name: ex.exerciseName, weight: bestSet.weight, reps: bestSet.reps, at: sess.finishedAt };
+        }
+        if (bestNow > hist) best[ex.exerciseId] = bestNow;
+      }
+    }
+    return latest;
+  },
+
+  // Training heute: erledigtes Workout oder Vorschlag (am längsten nicht gemacht) mit Startknopf
+  async trainingCard(today) {
+    if (typeof WorkoutSessionView !== 'undefined' && WorkoutSessionView.state.active && WorkoutSessionView.state.phase !== 'finished') return null; // läuft bereits (Karte oben)
+    const [sessions, workouts] = await Promise.all([DB.getAll('workoutSessions'), DB.getAll('workouts')]);
+    const done = sessions.filter((x) => x.finishedAt);
+    const todays = done.filter((x) => App.todayStr(new Date(x.finishedAt)) === today);
+    const card = App.el('div', { class: 'card' }, [
+      App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Training heute']),
+    ]);
+    const openFitness = () => { FitnessHub.activeTab = 'workouts'; App.navigate('fitness', { animate: true }); };
+
+    if (todays.length) {
+      card.appendChild(App.el('div', { class: 'line-list' }, todays.map((x) => this.line({
+        title: x.workoutName, meta: `${x.exerciseCount != null ? x.exerciseCount : x.exercises.length} Übungen · ${Math.round(x.totalVolume || 0)} kg Volumen`,
+        right: App.el('span', { html: Icons.check(), style: 'width:20px;height:20px;color:var(--success);display:block' }),
+        onClick: () => WorkoutSessionView.showSessionDetail(x),
+      }))));
+      return card;
+    }
+
+    if (!workouts.length) {
+      card.appendChild(App.el('div', { class: 'tag', style: 'margin-bottom:12px' }, 'Noch kein Workout angelegt.'));
+      card.appendChild(App.el('button', { class: 'btn secondary', style: 'margin:0', onclick: openFitness }, 'Workout erstellen'));
+      return card;
+    }
+
+    // Vorschlag: das Workout, das am längsten nicht dran war (nie gemacht = zuerst)
+    const last = {};
+    for (const x of done) if (x.workoutId && (!last[x.workoutId] || x.finishedAt > last[x.workoutId])) last[x.workoutId] = x.finishedAt;
+    const pick = workouts.slice().sort((a, b) => (last[a.id] || 0) - (last[b.id] || 0) || (a.createdAt || 0) - (b.createdAt || 0))[0];
+    card.appendChild(App.el('div', { style: 'font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, pick.name));
+    card.appendChild(App.el('div', { class: 'tag', style: 'margin:2px 0 12px' }, [
+      `${pick.exercises.length} Übungen`, last[pick.id] ? ` · zuletzt ${this.ago(last[pick.id])}` : ' · noch nie gemacht',
+    ].join('')));
+    card.appendChild(App.el('div', { class: 'row' }, [
+      App.el('button', { class: 'btn', style: 'flex:1;margin:0', onclick: async () => { await WorkoutSessionView.start(pick); openFitness(); } }, 'Starten'),
+      App.el('button', { class: 'btn secondary', style: 'flex:1;margin:0', onclick: () => WorkoutsView.openStartPicker() }, 'Anderes wählen'),
+    ]));
+    return card;
   },
 
   // „Was jetzt?“: aktueller Block, sonst der nächste – mit passender Aktion oder einem Vorschlag für freie Zeit.
