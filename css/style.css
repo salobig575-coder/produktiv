@@ -1090,8 +1090,9 @@ a { color: var(--accent); }
 }
 .tl-resize::after {
   content: ""; position: absolute; left: 50%; bottom: 3px; width: 22px; height: 3px; margin-left: -11px;
-  border-radius: 3px; background: currentColor; opacity: .25;
+  border-radius: 3px; background: currentColor; opacity: 0;
 }
+.tl-block.tall .tl-resize::after, .tl-block.dragging .tl-resize::after { opacity: .25; }
 .toast { display: flex; align-items: center; gap: 14px; }
 .toast-action { background: none; border: none; color: var(--accent-2); font-weight: 800; font-size: 14px; padding: 0; cursor: pointer; }
 
@@ -1099,3 +1100,45 @@ a { color: var(--accent); }
 .week-day.drop { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
 .week-item { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .week-item.dragging-week { position: relative; z-index: 20; touch-action: none; background: var(--surface); border-radius: 8px; padding: 2px 6px; box-shadow: var(--shadow-lg); }
+
+/* ---------- Aufgeräumte Listen, Segment, Chips (Heute & Kalender) ---------- */
+.today-head { margin: 0 0 14px; }
+.today-greet { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 12px; padding: 3px; gap: 2px; }
+.seg button {
+  border: none; background: transparent; padding: 6px 13px; border-radius: 9px; cursor: pointer;
+  font-weight: 700; font-size: 13px; color: var(--text-dim); transition: background .2s, color .2s;
+}
+.seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+
+.line-list { display: flex; flex-direction: column; }
+.line { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.line:last-child { border-bottom: none; }
+.line-main { flex: 1; min-width: 0; }
+.line-main .item-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line-right { flex: none; }
+.line-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .55; flex: none; margin: 0 7px; }
+
+.link-btn {
+  display: inline-flex; align-items: center; gap: 4px; margin: 10px 0 0 auto; padding: 4px 0; float: right;
+  background: none; border: none; color: var(--accent); font-weight: 800; font-size: 13px; cursor: pointer;
+}
+.card:has(> .link-btn)::after { content: ""; display: block; clear: both; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid transparent; font-weight: 700; font-size: 14px;
+  transition: transform .2s var(--ease-spring), background .2s, color .2s;
+}
+.chip:active { transform: scale(.94); }
+.chip-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--text-dim); box-sizing: border-box; }
+.chip.on { background: rgba(var(--accent-rgb), .16); color: var(--accent); }
+.chip.on .chip-dot { background: var(--accent); border-color: var(--accent); }
+
+.mini-row { display: flex; gap: 8px; }
+.mini { flex: 1; min-width: 0; text-align: center; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 4px; }
+.mini-num { font-size: 22px; font-weight: 800; }
+.mini-lbl { font-size: 10.5px; color: var(--text-dim); font-weight: 600; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

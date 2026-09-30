@@ -43,31 +43,25 @@ const CalendarView = {
   renderHeader() {
     const d = new Date(this.selectedDate + 'T00:00:00');
     const isToday = this.selectedDate === this.today();
-    return App.el('div', { style: 'margin-bottom:12px' }, [
-      App.el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:10px' }, [
-        App.el('div', {}, [
-          App.el('div', { style: 'font-size:19px;font-weight:800' }, isToday ? 'Heute' : d.toLocaleDateString('de-DE', { weekday: 'long' })),
-          App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })),
+    const seg = (key, label) => App.el('button', { class: this.mode === key ? 'active' : '', onclick: () => { this.mode = key; this._scrolled = false; App.refresh(); } }, label);
+    return App.el('div', { class: 'cal-head' }, [
+      App.el('div', { style: 'min-width:0' }, [
+        App.el('div', { class: 'row', style: 'gap:8px' }, [
+          App.el('div', { class: 'today-greet' }, isToday ? 'Heute' : d.toLocaleDateString('de-DE', { weekday: 'long' })),
+          !isToday ? App.el('button', { class: 'pill active', style: 'border:none;cursor:pointer', onclick: () => { this.selectedDate = this.today(); App.refresh(); } }, 'Heute') : null,
         ]),
-        App.el('div', { class: 'row', style: 'gap:6px' }, [
-          !isToday ? App.el('button', { class: 'btn secondary', style: 'width:auto;padding:8px 14px', onclick: () => { this.selectedDate = this.today(); App.refresh(); } }, 'Heute') : null,
-          App.el('button', { class: 'icon-btn', html: Icons.planen(), title: 'Monat', onclick: () => this.openMonth() }),
-        ]),
+        App.el('div', { class: 'tag' }, d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })),
       ]),
-      App.el('div', { class: 'fab-row', style: 'margin-bottom:0' }, [
-        this.modeBtn('day', 'Tag'),
-        this.modeBtn('week', 'Woche'),
+      App.el('div', { class: 'row', style: 'gap:6px' }, [
+        App.el('div', { class: 'seg' }, [seg('day', 'Tag'), seg('week', 'Woche')]),
+        App.el('button', { class: 'icon-btn', html: Icons.planen(), title: 'Monat', onclick: () => this.openMonth() }),
       ]),
     ]);
   },
 
-  modeBtn(key, label) {
-    return App.el('button', { class: 'btn secondary' + (this.mode === key ? ' selected' : ''), onclick: () => { this.mode = key; this._scrolled = false; App.refresh(); } }, label);
-  },
-
   renderQuickAdd() {
-    const input = App.el('input', { type: 'text', placeholder: 'Neu: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done' });
-    const hint = App.el('div', { class: 'tag', style: 'margin:6px 2px 0;min-height:16px' });
+    const input = App.el('input', { type: 'text', placeholder: 'Neu: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done', style: 'padding-right:48px' });
+    const hint = App.el('div', { class: 'tag', style: 'margin:6px 2px 0;display:none' });
     const submit = async () => {
       const p = Planner.parseQuick(input.value);
       if (!p.title) return;
@@ -76,12 +70,13 @@ const CalendarView = {
     input.addEventListener('input', () => {
       const p = Planner.parseQuick(input.value);
       hint.textContent = p.title ? Planner.describeQuick(p) : '';
+      hint.style.display = p.title ? '' : 'none';
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    return App.el('div', { style: 'margin-bottom:14px' }, [
-      App.el('div', { class: 'row' }, [
-        App.el('div', { style: 'flex:1' }, [input]),
-        App.el('button', { class: 'icon-btn', style: 'color:var(--accent)', html: Icons.plus(), title: 'Hinzufügen', onclick: submit }),
+    return App.el('div', { style: 'margin-bottom:12px' }, [
+      App.el('div', { style: 'position:relative' }, [
+        input,
+        App.el('button', { class: 'icon-btn', style: 'position:absolute;right:4px;top:50%;transform:translateY(-50%);color:var(--accent)', html: Icons.plus(), title: 'Hinzufügen', onclick: submit }),
       ]),
       hint,
     ]);
@@ -200,8 +195,8 @@ const CalendarView = {
   // ---------- Timeline ----------
   renderTimeline(items, s) {
     const PX = this.PX_PER_HOUR / 60;
-    const startH = Math.min(6, Math.floor(Math.min(s.start, ...items.map((i) => i.start)) / 60));
-    const endH = Math.max(22, Math.ceil(Math.max(s.end, ...items.map((i) => i.end)) / 60));
+    const startH = Math.max(0, Math.floor((Math.min(s.start, ...items.map((i) => i.start)) - 60) / 60));
+    const endH = Math.min(24, Math.ceil((Math.max(s.end, ...items.map((i) => i.end)) + 60) / 60));
     const top = (min) => (min - startH * 60) * PX;
 
     const tl = App.el('div', { class: 'timeline', style: `height:${(endH - startH) * this.PX_PER_HOUR}px` });
@@ -234,7 +229,7 @@ const CalendarView = {
 
     for (const it of items) {
       const h = Math.max(24, (it.end - it.start) * PX - 2);
-      const cls = 'tl-block ' + it.kind + (it.done ? ' done' : '') + (it.priority === 'high' ? ' high' : '');
+      const cls = 'tl-block ' + it.kind + (it.done ? ' done' : '') + (it.priority === 'high' ? ' high' : '') + (h >= 48 ? ' tall' : '');
       const block = App.el('div', {
         class: cls,
         style: `top:${top(it.start)}px;height:${h}px;left:calc(${(it.col / it.cols) * 100}% + 2px);width:calc(${100 / it.cols}% - 4px)`,
@@ -440,17 +435,16 @@ const CalendarView = {
       return card;
     }
     const today = this.today();
-    const list = App.el('div', { class: 'list' });
+    const list = App.el('div', { class: 'line-list' });
     for (const t of tasks.slice(0, 8)) {
       const overdue = t.dueDate && t.dueDate < today;
-      list.appendChild(App.el('div', { class: 'item' }, [
-        App.el('div', { style: 'flex:1;cursor:pointer;min-width:0', onclick: () => TasksView.openEditor(t) }, [
+      list.appendChild(App.el('div', { class: 'line' }, [
+        App.el('span', { class: 'line-dot' }),
+        App.el('div', { class: 'line-main', style: 'cursor:pointer', onclick: () => TasksView.openEditor(t) }, [
           App.el('div', { class: 'item-title' }, t.title),
-          App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, [
-            t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
-            App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration || 30)),
-          ]),
+          App.el('div', { class: 'tag' }, [Planner.fmtDur(t.duration || 30), t.dueDate ? ` · fällig ${App.formatDate(t.dueDate).slice(0, 6)}` : ''].join('')),
         ]),
+        overdue ? App.el('span', { class: 'pill overdue' }, 'überfällig') : null,
         App.el('button', {
           class: 'icon-btn', style: 'color:var(--accent)', html: Icons.planen(), title: 'Einplanen',
           onclick: async () => {
