@@ -64,7 +64,7 @@ const CalendarView = {
   },
 
   renderQuickAdd() {
-    const input = App.el('input', { type: 'text', placeholder: 'Schnell hinzufügen: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done' });
+    const input = App.el('input', { type: 'text', placeholder: 'Neu: „Zahnarzt Do 15 Uhr 1h“', enterkeyhint: 'done' });
     const hint = App.el('div', { class: 'tag', style: 'margin:6px 2px 0;min-height:16px' });
     const submit = async () => {
       const p = Planner.parseQuick(input.value);
