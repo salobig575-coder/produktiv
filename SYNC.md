@@ -18,9 +18,9 @@ Das Repo ist öffentlich, also ist auch der Code der Seite öffentlich. Deine **
 ## 3. Sync einrichten (Supabase, kostenlos)
 
 1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen.
-2. **SQL Editor** → Inhalt von `supabase/schema.sql` einfügen → Run.
-3. **Authentication → Providers → Email**: „Confirm email“ ausschalten (sonst musst du beim Registrieren erst einen Link bestätigen).
-4. **Project Settings → API**: *Project URL* und den *anon public* Key kopieren.
+2. **SQL Editor** (Symbol `>_` in der linken Leiste) → Inhalt von `supabase/schema.sql` einfügen → Run.
+3. Links im Menü **Authentication** öffnen, dort unter **CONFIGURATION** auf **Sign In / Providers** klicken, **Email** aufklappen und **„Confirm email“ ausschalten** (sonst musst du beim Registrieren erst einen Link bestätigen). Dann speichern.
+4. **Project Settings** (Zahnrad unten links) → **API Keys**: den *anon* bzw. *publishable* Key kopieren. Die *Project URL* ist `https://<Projekt-ID>.supabase.co` – die Projekt-ID steht in der Adresszeile nach `/project/`. Beides findest du auch hinter dem grünen Knopf **Connect** oben.
 5. In Produktiv: Zahnrad → **Geräte-Sync** → URL und Key eintragen, E-Mail und Passwort wählen → **Registrieren**.
 6. Auf den anderen Geräten dieselben Angaben eintragen und **Anmelden**.
 
