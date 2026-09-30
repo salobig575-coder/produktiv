@@ -40,7 +40,12 @@ const TasksView = {
         }),
         App.el('div', { style: 'flex:1;cursor:pointer', onclick: () => this.openEditor(t) }, [
           App.el('div', { class: 'item-title' }, t.title),
-          t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
+          App.el('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, [
+            t.dueDate ? App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)) : null,
+            t.planStart != null && !t.done ? App.el('span', { class: 'pill active' }, `${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)}`) : null,
+            t.duration ? App.el('span', { class: 'pill' }, Planner.fmtDur(t.duration)) : null,
+            t.repeat && t.repeat !== 'none' ? App.el('span', { class: 'pill' }, Planner.REPEAT_LABEL[t.repeat]) : null,
+          ]),
         ]),
         App.el('button', { class: 'icon-btn', html: Icons.trash(), onclick: (e) => this.remove(t, e) }),
       ]);
@@ -62,6 +67,7 @@ const TasksView = {
     t.updatedAt = Date.now();
     if (btn) btn.classList.add('pop');
     await DB.put('tasks', t);
+    if (t.done) await Planner.spawnNext(t);
     setTimeout(() => App.refresh(), t.done ? 220 : 0);
   },
 
@@ -86,6 +92,10 @@ const TasksView = {
       App.el('option', { value: 'high' }, 'Hoch'),
     ]);
     prioSelect.value = t.priority || 'normal';
+    const durSelect = App.el('select', {}, [App.el('option', { value: '' }, 'Keine Angabe (30 min)')].concat([15, 30, 45, 60, 90, 120, 180, 240].map((m) => App.el('option', { value: m }, Planner.fmtDur(m)))));
+    durSelect.value = t.duration ? String(t.duration) : '';
+    const repeatSelect = App.el('select', {}, Object.entries(Planner.REPEAT_LABEL).map(([k, l]) => App.el('option', { value: k }, l)));
+    repeatSelect.value = t.repeat || 'none';
     const notesInput = App.el('textarea', { placeholder: 'Notizen (optional)' }, t.notes || '');
 
     const content = App.el('div', {}, [
@@ -93,6 +103,14 @@ const TasksView = {
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Titel'), titleInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Fällig am'), dueInput]),
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Priorität'), prioSelect]),
+      App.el('div', { class: 'row' }, [
+        App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Dauer'), durSelect]),
+        App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Wiederholung'), repeatSelect]),
+      ]),
+      t.planStart != null ? App.el('button', { class: 'btn secondary', style: 'margin-bottom:12px', onclick: async () => {
+        t.planDate = null; t.planStart = null; t.updatedAt = Date.now();
+        await DB.put('tasks', t); App.closeModal(); App.refresh();
+      } }, `Aus Plan nehmen (${App.formatDate(t.planDate).slice(0, 6)} ${Planner.fmt(t.planStart)})`) : null,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Notizen'), notesInput]),
       App.el('div', { class: 'row' }, [
         App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Abbrechen'),
@@ -102,6 +120,8 @@ const TasksView = {
             if (!t.title) { titleInput.focus(); return; }
             t.dueDate = dueInput.value || '';
             t.priority = prioSelect.value;
+            t.duration = durSelect.value ? Number(durSelect.value) : null;
+            t.repeat = repeatSelect.value;
             t.notes = notesInput.value;
             t.updatedAt = Date.now();
             await DB.put('tasks', t);

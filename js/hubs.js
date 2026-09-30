@@ -1,13 +1,14 @@
 const PlanenHub = {
-  activeTab: 'tasks',
+  activeTab: 'calendar',
   tabs: [
+    { key: 'calendar', label: 'Kalender' },
     { key: 'tasks', label: 'Aufgaben' },
     { key: 'notes', label: 'Notizen' },
     { key: 'habits', label: 'Habits' },
     { key: 'focus', label: 'Fokus' },
   ],
   viewFor(key) {
-    return { tasks: TasksView, notes: NotesView, habits: HabitsView, focus: FocusView }[key];
+    return { calendar: CalendarView, tasks: TasksView, notes: NotesView, habits: HabitsView, focus: FocusView }[key];
   },
 
   async render() {

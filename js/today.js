@@ -38,6 +38,30 @@ const TodayView = {
       ]),
     ]));
 
+    if (typeof Planner !== 'undefined') {
+      const pdata = await Planner.load();
+      const nowMin = Planner.nowMin();
+      const upcoming = Planner.dayItems(today, pdata).filter((i) => !i.done && i.end > nowMin).slice(0, 4);
+      const planCard = App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.planen(), style: 'width:14px;height:14px' }), 'Heutiger Plan']),
+      ]);
+      if (upcoming.length === 0) {
+        planCard.appendChild(App.el('div', { class: 'empty', style: 'padding:16px 10px' }, 'Nichts mehr geplant.'));
+      } else {
+        planCard.appendChild(App.el('div', { class: 'list' }, upcoming.map((i) => App.el('div', { class: 'item' }, [
+          App.el('div', { class: 'pill' + (i.start <= nowMin ? ' active' : '') }, Planner.fmt(i.start)),
+          App.el('div', { style: 'flex:1;min-width:0' }, [
+            App.el('div', { class: 'item-title' }, i.title),
+            App.el('div', { class: 'tag' }, Planner.fmtDur(i.dur)),
+          ]),
+        ]))));
+      }
+      planCard.appendChild(App.el('button', { class: 'btn secondary', style: 'margin-top:12px', onclick: () => { PlanenHub.activeTab = 'calendar'; CalendarView.selectedDate = today; CalendarView.mode = 'day'; App.navigate('planen'); } }, [
+        'Zum Kalender', App.el('span', { html: Icons.arrowRight(), style: 'width:16px;height:16px' }),
+      ]));
+      wrap.appendChild(planCard);
+    }
+
     const taskCard = App.el('div', { class: 'card' }, [
       App.el('h2', {}, [App.el('span', { html: Icons.tasks(), style: 'width:14px;height:14px' }), 'Fällige Aufgaben']),
     ]);
@@ -48,7 +72,7 @@ const TodayView = {
       for (const t of dueToday.slice(0, 6)) {
         const overdue = t.dueDate < today;
         list.appendChild(App.el('div', { class: 'item' }, [
-          App.el('button', { class: 'checkbox', html: Icons.check(), onclick: async (e) => { e.currentTarget.classList.add('checked', 'pop'); t.done = true; await DB.put('tasks', t); setTimeout(() => App.refresh(), 200); } }),
+          App.el('button', { class: 'checkbox', html: Icons.check(), onclick: async (e) => { e.currentTarget.classList.add('checked', 'pop'); t.done = true; await DB.put('tasks', t); await Planner.spawnNext(t); setTimeout(() => App.refresh(), 200); } }),
           App.el('div', { style: 'flex:1' }, [
             App.el('div', { class: 'item-title' }, t.title),
             App.el('span', { class: 'pill' + (overdue ? ' overdue' : '') }, App.formatDate(t.dueDate)),

@@ -44,6 +44,15 @@ const SettingsView = {
     metricSelect.value = intensityMetric;
     metricSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'intensityMetric', value: e.target.value }); });
 
+    const ps = await Planner.settings();
+    const startInput = App.el('input', { type: 'time', value: Planner.fmt(ps.start) });
+    const endInput = App.el('input', { type: 'time', value: Planner.fmt(ps.end) });
+    startInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerStart', value: Planner.parseTime(startInput.value) }); });
+    endInput.addEventListener('change', async () => { await DB.put('settings', { key: 'plannerEnd', value: Planner.parseTime(endInput.value) }); });
+    const bufferSelect = App.el('select', {}, [0, 5, 10, 15, 30].map((m) => App.el('option', { value: m }, m ? `${m} Minuten` : 'Kein Puffer')));
+    bufferSelect.value = String(ps.buffer);
+    bufferSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'plannerBuffer', value: Number(e.target.value) }); });
+
     const content = App.el('div', {}, [
       App.el('h3', {}, 'Einstellungen'),
       App.el('div', { class: 'card' }, [
@@ -53,6 +62,18 @@ const SettingsView = {
           themeBtn('light', 'Hell'),
           themeBtn('dark', 'Dunkel'),
         ]),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.planen(), style: 'width:14px;height:14px' }), 'Planer']),
+        App.el('div', { class: 'row' }, [
+          App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Tag beginnt'), startInput]),
+          App.el('div', { class: 'field', style: 'flex:1' }, [App.el('label', {}, 'Tag endet'), endInput]),
+        ]),
+        App.el('div', { class: 'field' }, [App.el('label', {}, 'Puffer zwischen Blöcken'), bufferSelect, App.el('p', { class: 'tag', style: 'margin-top:4px' }, 'Die automatische Planung nutzt nur Zeit innerhalb dieses Fensters.')]),
+        App.switchRow('Erinnerungen', 'Hinweis vor Terminen, solange Produktiv geöffnet ist. Benachrichtigungen des Browsers werden zusätzlich genutzt, falls erlaubt.', ps.reminders, async (val) => {
+          await DB.put('settings', { key: 'remindersEnabled', value: val });
+          if (val && 'Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
+        }),
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.fitness(), style: 'width:14px;height:14px' }), 'Training & Fortschritt']),
