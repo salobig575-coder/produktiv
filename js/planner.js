@@ -354,11 +354,15 @@ const Planner = {
     try { localStorage.setItem('plannerFired', JSON.stringify(fired)); } catch (e) {}
   },
 
-  toast(text) {
-    const t = App.el('div', { class: 'toast' }, text);
+  toast(text, action) {
+    const t = App.el('div', { class: 'toast' }, [text]);
+    if (action) {
+      t.appendChild(App.el('button', { class: 'toast-action', onclick: () => { t.remove(); action.fn(); } }, action.label));
+    }
     document.body.appendChild(t);
-    setTimeout(() => t.classList.add('hide'), 4200);
-    setTimeout(() => t.remove(), 4700);
+    const life = action ? 6000 : 4200;
+    setTimeout(() => t.classList.add('hide'), life);
+    setTimeout(() => t.remove(), life + 500);
   },
   // ---------- ICS Export / Import ----------
   ICS_DAYS: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'],

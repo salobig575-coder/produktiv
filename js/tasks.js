@@ -77,6 +77,7 @@ const TasksView = {
     setTimeout(async () => {
       await DB.delete('tasks', t.id);
       App.refresh();
+      Planner.toast('Aufgabe gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('tasks', t); App.refresh(); } });
     }, 220);
   },
 

@@ -253,6 +253,7 @@ const CalendarView = {
           h >= 40 ? App.el('div', { class: 'tl-time' }, `${Planner.fmt(it.start)}–${Planner.fmt(it.end)}`) : null,
         ]),
       ]);
+      if (it.type !== 'habit') this.makeDraggable(block, it, PX);
       surface.appendChild(block);
     }
     tl.appendChild(surface);
@@ -273,6 +274,62 @@ const CalendarView = {
       if (anchor) setTimeout(() => anchor.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
     }
     return card;
+  },
+
+  // ---------- Verschieben & Größe ändern ----------
+  // Langes Drücken (bzw. Ziehen mit der Maus) verschiebt in 15-Minuten-Schritten, der untere Griff ändert die Dauer.
+  makeDraggable(block, it, PX) {
+    const STEP = 15;
+    const handle = App.el('div', { class: 'tl-resize' });
+    block.appendChild(handle);
+    const timeEl = () => block.querySelector('.tl-time');
+    const snap = (dy) => Math.round(dy / PX / STEP) * STEP;
+    let mode = null, y0 = 0, timer = null, moved = false, start = it.start, dur = it.dur, drag = false;
+
+    const label = () => { const t = timeEl(); if (t) t.textContent = `${Planner.fmt(start)}–${Planner.fmt(start + dur)}`; };
+    const finish = async (commit) => {
+      block.classList.remove('dragging');
+      block._suppressClick = drag && moved;
+      if (drag && moved && commit) {
+        const clampStart = Math.max(0, Math.min(start, 1440 - dur));
+        if (it.type === 'event') { it.ref.start = clampStart; it.ref.dur = dur; await DB.put('events', it.ref); }
+        else { it.ref.planDate = this.selectedDate; it.ref.planStart = clampStart; it.ref.duration = dur; it.ref.updatedAt = Date.now(); await DB.put('tasks', it.ref); }
+        this._scrolled = true;
+        App.refresh();
+      }
+      mode = null; drag = false; moved = false;
+    };
+    const begin = (m, e) => {
+      mode = m; y0 = e.clientY; start = it.start; dur = it.dur; moved = false; drag = false;
+      const go = () => { drag = true; block.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); };
+      if (m === 'resize') go(); else if (e.pointerType === 'mouse') { /* Maus: Ziehen genügt */ } else timer = setTimeout(go, 350);
+    };
+
+    handle.addEventListener('pointerdown', (e) => { e.stopPropagation(); block.setPointerCapture(e.pointerId); begin('resize', e); });
+    block.addEventListener('pointerdown', (e) => {
+      if (e.target === handle || e.target.closest('.checkbox')) return;
+      block.setPointerCapture(e.pointerId);
+      begin('move', e);
+    });
+    block.addEventListener('pointermove', (e) => {
+      if (!mode) return;
+      const dy = e.clientY - y0;
+      if (!drag) {
+        if (Math.abs(dy) > 8) { if (e.pointerType === 'mouse' && mode === 'move') { drag = true; block.classList.add('dragging'); } else { clearTimeout(timer); mode = null; } }
+        if (!drag) return;
+      }
+      const d = snap(dy);
+      if (mode === 'move') { start = it.start + d; block.style.transform = `translateY(${d * PX}px)`; }
+      else { dur = Math.max(STEP, it.dur + d); block.style.height = `${Math.max(24, dur * PX - 2)}px`; }
+      moved = moved || d !== 0;
+      label();
+    });
+    const end = (commit) => (e) => { clearTimeout(timer); if (mode) finish(commit); };
+    block.addEventListener('pointerup', end(true));
+    block.addEventListener('pointercancel', end(false));
+    // Solange gezogen wird, darf die Seite nicht scrollen
+    block.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+    block.addEventListener('click', (e) => { if (block._suppressClick) { e.stopImmediatePropagation(); e.preventDefault(); block._suppressClick = false; } }, true);
   },
 
   // ---------- Morgen-Überblick / Tagesabschluss ----------
@@ -528,10 +585,12 @@ const CalendarView = {
     if (!isNew) {
       const recurring = (e.repeat || 'none') !== 'none';
       const del = async (onlyThisDay) => {
+        const before = ev ? { ...ev, skip: [...(ev.skip || [])] } : null;
         if (onlyThisDay) { e.skip = [...(e.skip || []), this.selectedDate]; await DB.put('events', e); }
         else await DB.delete('events', e.id);
         App.closeModal();
         App.refresh();
+        Planner.toast(onlyThisDay ? 'Für diesen Tag gelöscht.' : 'Termin gelöscht.', { label: 'Rückgängig', fn: async () => { await DB.put('events', before); App.refresh(); } });
       };
       const extra = [];
       if (e.kind === 'focus') {
