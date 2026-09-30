@@ -494,10 +494,10 @@ nav.bottomnav .nav-indicator {
   top: 6px;
   bottom: 6px;
   left: 6px;
-  width: calc((100% - 12px) / 3);
+  width: 0;
   background: var(--accent-dim);
   border-radius: 18px;
-  transition: transform .4s var(--ease-spring), background .3s var(--ease);
+  transition: transform .42s var(--ease-ios), width .42s var(--ease-ios), opacity .25s, background .3s var(--ease);
   z-index: 0;
 }
 nav.bottomnav button {
@@ -1330,3 +1330,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 11px 13px; cursor: pointer;
   background: rgba(var(--warn-rgb), .13); border-radius: var(--radius-sm);
 }
+
+/* ================= Untere Leiste mit Bereichs-Tabs ================= */
+nav.bottomnav button { min-width: 0; }
+nav.bottomnav .nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.02em; }
+nav.bottomnav button.nav-back { flex: 0 0 40px; opacity: .8; font-size: 9.5px; }
+nav.bottomnav.sect button:not(.nav-back) { font-size: 10px; }
+nav.bottomnav.sect { padding: 6px 4px; gap: 0; }
+nav.bottomnav.swap button { animation: navItemIn .36s var(--ease-ios) both; }
+nav.bottomnav.swap button:nth-child(3) { animation-delay: .03s; }
+nav.bottomnav.swap button:nth-child(4) { animation-delay: .06s; }
+nav.bottomnav.swap button:nth-child(5) { animation-delay: .09s; }
+nav.bottomnav.swap button:nth-child(6) { animation-delay: .12s; }
+nav.bottomnav.swap button:nth-child(7) { animation-delay: .15s; }
+@keyframes navItemIn { 0% { opacity: 0; transform: translateY(8px) scale(.92); } 100% { opacity: 1; transform: none; } }
+
+/* Symbole ohne festgelegte Größe bekommen eine sichere Standardgröße (Safari zeichnet sie sonst teils mit Größe 0) */
+:where(svg:not([width])) { width: 1.25em; height: 1.25em; }
+#searchBtn svg { width: 19px; height: 19px; }
+@media (max-width: 340px) { nav.bottomnav.sect button:not(.nav-back) { font-size: 9px; } }
+@media (max-width: 340px) { nav.bottomnav.sect button:not(.nav-back) { letter-spacing: -.05em; } }
