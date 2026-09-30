@@ -19,10 +19,9 @@ const TasksView = {
     if (this.filter === 'done') visible = tasks.filter((t) => t.done);
 
     if (visible.length === 0) {
-      wrap.appendChild(App.el('div', { class: 'empty' }, [
-        App.el('div', { class: 'empty-icon', html: Icons.tasks() }),
-        this.filter === 'done' ? 'Noch nichts erledigt.' : 'Keine Aufgaben – tippe auf +.',
-      ]));
+      wrap.appendChild(this.filter === 'done'
+        ? App.emptyState({ icon: 'tasks', title: 'Noch nichts erledigt', sub: 'Erledigte Aufgaben erscheinen hier.' })
+        : App.emptyState({ icon: 'tasks', title: 'Keine offenen Aufgaben', sub: 'Lege eine Aufgabe an – oder nutze die Schnelleingabe im Kalender, z. B. „Steuer morgen 45min“.', action: { label: 'Aufgabe hinzufügen', fn: () => this.openEditor() } }));
       return wrap;
     }
 
