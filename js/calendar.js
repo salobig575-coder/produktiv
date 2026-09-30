@@ -9,6 +9,7 @@ const CalendarView = {
   async render() {
     if (!this.selectedDate) this.selectedDate = this.today();
     Planner.startReminders();
+    Native.syncReminders();
     const wrap = App.el('div');
     const data = await Planner.load();
     const s = data.s;
@@ -405,6 +406,7 @@ const CalendarView = {
       App.el('div', { style: 'font-weight:800' }, `${fmtShort(start)} – ${fmtShort(last)}`),
       App.el('button', { class: 'icon-btn', html: Icons.arrowRight(), onclick: () => { this.selectedDate = Planner.addDays(start, 7); App.refresh(); } }),
     ]));
+    wrap.appendChild(this.renderReview(start, last, data));
     const capacity = s.end - s.start;
     for (let i = 0; i < 7; i++) {
       const ds = Planner.addDays(start, i);
@@ -436,6 +438,43 @@ const CalendarView = {
       wrap.appendChild(card);
     }
     return wrap;
+  },
+
+  // ---------- Wochenrückblick (lokal berechnet, KI-Fazit optional) ----------
+  renderReview(start, last, data) {
+    const card = App.el('div', { class: 'card' }, [
+      App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'Rückblick']),
+    ]);
+    (async () => {
+      const [sessions] = await Promise.all([DB.getAll('focusSessions')]);
+      const inWeek = (ms) => { const d = App.todayStr(new Date(ms)); return d >= start && d <= last; };
+      const doneTasks = data.tasks.filter((t) => t.done && t.updatedAt && inWeek(t.updatedAt));
+      const focusMin = Math.round(sessions.filter((x) => inWeek(x.startedAt)).reduce((a, x) => a + x.duration, 0) / 60);
+      const habitDays = data.logs.filter((l) => l.date >= start && l.date <= last).length;
+      let plannedMin = 0;
+      for (let i = 0; i < 7; i++) plannedMin += Planner.loadMinutes(Planner.dayItems(Planner.addDays(start, i), data));
+      const factor = Planner.estimateFactor(data.tasks);
+      const stat = (n, l) => App.el('div', { class: 'stat', style: 'flex:1 1 calc(50% - 5px)' }, [App.el('div', { class: 'num' }, String(n)), App.el('div', { class: 'lbl' }, l)]);
+      card.appendChild(App.el('div', { class: 'stat-row' }, [
+        stat(doneTasks.length, 'Erledigt'), stat(focusMin, 'Fokus-Min'), stat(habitDays, 'Routinen'), stat(Math.round(plannedMin / 60 * 10) / 10, 'Std. geplant'),
+      ]));
+      if (Math.abs(factor - 1) > 0.15) {
+        card.appendChild(App.el('div', { class: 'tag', style: 'margin-top:10px' }, `Deine Aufgaben dauern im Schnitt ${factor > 1 ? Math.round((factor - 1) * 100) + ' % länger' : Math.round((1 - factor) * 100) + ' % kürzer'} als geschätzt.`));
+      }
+      if (await AI.enabled()) {
+        const out = App.el('div', { class: 'tag', style: 'margin-top:10px;color:var(--text)' });
+        const btn = App.el('button', { class: 'btn secondary', style: 'margin:12px 0 0', onclick: async () => {
+          btn.textContent = 'Denke nach …';
+          try {
+            out.textContent = await AI.weeklySummary({ erledigteAufgaben: doneTasks.map((t) => t.title).slice(0, 15), fokusMinuten: focusMin, routinenAbgehakt: habitDays, geplanteStunden: plannedMin / 60, schaetzfaktor: factor });
+            btn.remove();
+          } catch (e) { btn.textContent = 'KI-Fazit erstellen'; out.textContent = e.message; }
+        } }, [App.el('span', { html: Icons.sparkles(), style: 'width:16px;height:16px' }), 'KI-Fazit erstellen']);
+        card.appendChild(btn);
+        card.appendChild(out);
+      }
+    })();
+    return card;
   },
 
   // ---------- Termin-Editor ----------

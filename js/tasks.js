@@ -116,6 +116,7 @@ const TasksView = {
           PlanenHub.activeTab = 'focus'; App.closeModal(); App.navigate('planen');
         } else Planner.toast('Es läuft bereits ein Fokus.');
       } }, [App.el('span', { html: Icons.focus(), style: 'width:16px;height:16px' }), 'Fokus dazu starten']) : null,
+      !isNew ? App.el('button', { class: 'btn secondary', style: 'margin-bottom:12px', onclick: (e) => this.aiBreakdown(t, e.currentTarget) }, [App.el('span', { html: Icons.sparkles(), style: 'width:16px;height:16px' }), 'Mit KI in Schritte zerlegen']) : null,
       t.actual ? App.el('p', { class: 'tag', style: 'margin:0 0 12px' }, `Tatsächlich ${Planner.fmtDur(t.actual)} gearbeitet${t.duration ? ` (geplant ${Planner.fmtDur(t.duration)})` : ''}.`) : null,
       App.el('div', { class: 'field' }, [App.el('label', {}, 'Notizen'), notesInput]),
       App.el('div', { class: 'row' }, [
@@ -139,5 +140,39 @@ const TasksView = {
     ]);
     App.showModal(content);
     setTimeout(() => titleInput.focus(), 50);
+  },
+
+  async aiBreakdown(t, btn) {
+    if (!(await AI.enabled())) { Planner.toast('Erst in den Einstellungen unter „KI“ einen Zugang eintragen.'); return; }
+    const label = btn.lastChild.textContent;
+    btn.lastChild.textContent = 'Denke nach …';
+    btn.disabled = true;
+    try {
+      const steps = await AI.breakdown(t);
+      const rows = steps.map((st) => App.el('div', { class: 'item' }, [
+        App.el('div', { style: 'flex:1;min-width:0' }, [App.el('div', { class: 'item-title' }, st.title), App.el('div', { class: 'tag' }, Planner.fmtDur(st.minutes))]),
+      ]));
+      App.closeModal();
+      setTimeout(() => App.showModal(App.el('div', {}, [
+        App.el('h3', { style: 'margin-bottom:4px' }, 'Vorgeschlagene Schritte'),
+        App.el('div', { class: 'tag', style: 'margin-bottom:14px' }, t.title),
+        App.el('div', { class: 'list', style: 'margin-bottom:14px' }, rows),
+        App.el('div', { class: 'row' }, [
+          App.el('button', { class: 'btn secondary', onclick: () => App.closeModal() }, 'Verwerfen'),
+          App.el('button', { class: 'btn', onclick: async () => {
+            for (const st of steps) {
+              await DB.put('tasks', { id: DB.uid(), title: st.title, dueDate: t.dueDate || '', priority: t.priority || 'normal', notes: `Schritt zu: ${t.title}`, done: false, duration: st.minutes, repeat: 'none', createdAt: Date.now(), updatedAt: Date.now() });
+            }
+            App.closeModal();
+            App.refresh();
+            Planner.toast(`${steps.length} Schritte in der Inbox.`);
+          } }, 'Als Aufgaben anlegen'),
+        ]),
+      ])), 230);
+    } catch (e) {
+      btn.lastChild.textContent = label;
+      btn.disabled = false;
+      Planner.toast(e.message);
+    }
   },
 };

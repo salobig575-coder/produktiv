@@ -53,6 +53,15 @@ const SettingsView = {
     bufferSelect.value = String(ps.buffer);
     bufferSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'plannerBuffer', value: Number(e.target.value) }); });
 
+    const ai = await AI.config();
+    const keyInput = App.el('input', { type: 'password', value: ai.key, placeholder: 'sk-ant-…', autocomplete: 'off' });
+    keyInput.addEventListener('change', async () => { await DB.put('settings', { key: 'aiKey', value: keyInput.value.trim() }); });
+    const modelSelect = App.el('select', {}, AI.MODELS.map((m) => App.el('option', { value: m.key }, m.label)));
+    modelSelect.value = ai.model;
+    modelSelect.addEventListener('change', async (e) => { await DB.put('settings', { key: 'aiModel', value: e.target.value }); });
+    const endpointInput = App.el('input', { type: 'url', value: ai.endpoint, placeholder: 'Optional: eigener Proxy (statt api.anthropic.com)' });
+    endpointInput.addEventListener('change', async () => { await DB.put('settings', { key: 'aiEndpoint', value: endpointInput.value.trim() }); });
+
     const icsInput = App.el('input', { type: 'file', accept: '.ics,text/calendar', style: 'display:none' });
     icsInput.addEventListener('change', () => this.importICS(icsInput.files[0]));
 
@@ -75,8 +84,16 @@ const SettingsView = {
         App.el('div', { class: 'field' }, [App.el('label', {}, 'Puffer zwischen Blöcken'), bufferSelect, App.el('p', { class: 'tag', style: 'margin-top:4px' }, 'Die automatische Planung nutzt nur Zeit innerhalb dieses Fensters.')]),
         App.switchRow('Erinnerungen', 'Hinweis vor Terminen, solange Produktiv geöffnet ist. Benachrichtigungen des Browsers werden zusätzlich genutzt, falls erlaubt.', ps.reminders, async (val) => {
           await DB.put('settings', { key: 'remindersEnabled', value: val });
+          if (val && Native.isNative()) await Native.requestNotifications();
           if (val && 'Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
         }),
+      ]),
+      App.el('div', { class: 'card' }, [
+        App.el('h2', {}, [App.el('span', { html: Icons.sparkles(), style: 'width:14px;height:14px' }), 'KI (optional)']),
+        App.el('p', { class: 'tag' }, 'Aufgaben in Schritte zerlegen und Wochenfazit. Der Schlüssel bleibt nur auf diesem Gerät; Anfragen gehen direkt an Anthropic. Ohne Schlüssel funktioniert alles andere wie gewohnt.'),
+        App.el('div', { class: 'field' }, [App.el('label', {}, 'API-Schlüssel'), keyInput]),
+        App.el('div', { class: 'field' }, [App.el('label', {}, 'Modell'), modelSelect]),
+        App.el('div', { class: 'field', style: 'margin-bottom:0' }, [App.el('label', {}, 'Proxy-Endpunkt'), endpointInput]),
       ]),
       App.el('div', { class: 'card' }, [
         App.el('h2', {}, [App.el('span', { html: Icons.planen(), style: 'width:14px;height:14px' }), 'Kalender-Austausch']),

@@ -348,7 +348,7 @@ const Planner = {
       const msg = ev.remind ? `${ev.title} startet in ${ev.remind} min (${this.fmt(ev.start)})` : `${ev.title} startet jetzt`;
       this.toast(msg);
       try {
-        if ('Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: msg, icon: 'icons/icon.svg' });
+        if (!Native.isNative() && 'Notification' in window && Notification.permission === 'granted') new Notification('Produktiv', { body: msg, icon: 'icons/icon.svg' });
       } catch (e) {}
     }
     try { localStorage.setItem('plannerFired', JSON.stringify(fired)); } catch (e) {}
