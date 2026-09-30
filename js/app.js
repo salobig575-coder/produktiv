@@ -10,11 +10,6 @@ const App = {
 
   init() {
     document.getElementById('settingsBtn').innerHTML = Icons.settings();
-    document.querySelectorAll('nav.bottomnav button').forEach((btn) => {
-      const route = btn.dataset.route;
-      btn.querySelector('.ic').innerHTML = Icons[this.routes[route].icon]();
-      btn.addEventListener('click', () => this.navigate(route));
-    });
     document.getElementById('settingsBtn').addEventListener('click', () => SettingsView.open());
     document.getElementById('searchBtn').innerHTML = Icons.search();
     document.getElementById('searchBtn').addEventListener('click', () => SearchView.open());
@@ -23,6 +18,8 @@ const App = {
     const surface = (m) => { if (Date.now() - lastErr > 4000) { lastErr = Date.now(); Planner.toast('Fehler: ' + String(m).slice(0, 90)); } };
     window.addEventListener('error', (e) => surface(e.message));
     window.addEventListener('unhandledrejection', (e) => surface((e.reason && e.reason.message) || e.reason));
+    this.renderNav();
+    window.addEventListener('resize', () => this.renderNav());
     this.bindShortcuts();
     this.bindGestures();
 
@@ -196,6 +193,69 @@ const App = {
     ]));
   },
 
+  // Untere Leiste: im Bereich Planen/Fitness zeigt sie dessen Tabs (mit „Menü“ zurück zu Heute/Planen/Fitness),
+  // sonst die drei Hauptbereiche. Die obere Tab-Leiste gibt es nicht mehr.
+  navItems() {
+    const route = this.current;
+    const hub = { planen: PlanenHub, fitness: FitnessHub }[route];
+    if (hub && !this._menuOpen) {
+      return [
+        { key: '__menu', label: 'Menü', icon: 'chevronLeft', back: true, fn: () => { this._menuOpen = true; this.renderNav(); } },
+        ...hub.tabs.map((t) => ({
+          key: 't:' + t.key, tab: t.key, label: t.label, icon: hub.tabIcons[t.key], active: hub.activeTab === t.key,
+          fn: () => { hub.activeTab = t.key; this._menuOpen = false; this.navigate(route, { animate: true }); },
+        })),
+      ];
+    }
+    return this.routeOrder.map((r) => ({
+      key: 'r:' + r, route: r, label: this.routes[r].title, icon: this.routes[r].icon, active: r === route,
+      fn: () => {
+        if (r === this.current) { this._menuOpen = false; this.renderNav(); this.refresh(); return; }
+        this._menuOpen = false;
+        this.navigate(r);
+      },
+    }));
+  },
+
+  renderNav() {
+    const nav = document.getElementById('bottomNav');
+    if (!nav) return;
+    const items = this.navItems();
+    const sig = items.map((i) => i.key).join('|');
+    if (sig !== this._navSig) {
+      this._navSig = sig;
+      nav.querySelectorAll('button').forEach((b) => b.remove());
+      nav.classList.toggle('sect', items.some((i) => i.back));
+      nav.classList.remove('swap');
+      void nav.offsetWidth;
+      nav.classList.add('swap');
+      items.forEach((it) => {
+        const btn = this.el('button', {
+          class: it.back ? 'nav-back' : '', 'aria-label': it.label, onclick: () => it.fn(),
+        }, [this.el('span', { class: 'ic', html: Icons[it.icon]() }), this.el('span', { class: 'nav-label' }, it.label)]);
+        if (it.route) btn.dataset.route = it.route;
+        if (it.tab) btn.dataset.tab = it.tab;
+        nav.appendChild(btn);
+      });
+    }
+    const btns = [...nav.querySelectorAll('button')];
+    let activeBtn = null;
+    items.forEach((it, i) => {
+      btns[i].classList.toggle('active', !!it.active);
+      if (it.active) { btns[i].setAttribute('aria-current', 'page'); activeBtn = btns[i]; } else btns[i].removeAttribute('aria-current');
+    });
+    // Markierung unter dem aktiven Eintrag (pixelgenau statt Drittel-Annahme)
+    const ind = document.getElementById('navIndicator');
+    if (ind) {
+      requestAnimationFrame(() => {
+        if (!activeBtn) { ind.style.opacity = '0'; return; }
+        ind.style.opacity = '1';
+        ind.style.width = activeBtn.offsetWidth + 'px';
+        ind.style.transform = `translateX(${activeBtn.offsetLeft - 6}px)`;
+      });
+    }
+  },
+
   // Rendert eine Ansicht ohne Flackern: alter Inhalt bleibt stehen, bis der neue fertig ist (kein leerer Zwischenzustand).
   // Gleicher Bereich + gleicher Tab = "leises" Aktualisieren: keine Einblend-Animation, Scrollposition bleibt.
   navigate(route, opts = {}) {
@@ -205,12 +265,8 @@ const App = {
     this.current = route;
     if (location.hash !== '#' + route) location.hash = route;
 
-    document.querySelectorAll('nav.bottomnav button').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.route === route);
-    });
-    const idx = this.routeOrder.indexOf(route);
-    const indicator = document.getElementById('navIndicator');
-    if (indicator) indicator.style.transform = `translateX(${idx * 100}%)`;
+    if (!silent) this._menuOpen = false; // Wechsel in einen Bereich zeigt dessen Tabs unten
+    this.renderNav();
 
     document.getElementById('pageTitle').textContent = this.routes[route].title;
     if (!silent) document.getElementById('pageSub').textContent = '';

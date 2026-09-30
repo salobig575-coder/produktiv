@@ -1,5 +1,6 @@
 const PlanenHub = {
   activeTab: 'calendar',
+  tabIcons: { calendar: 'planen', tasks: 'tasks', notes: 'notes', habits: 'habits', focus: 'focus' },
   tabs: [
     { key: 'calendar', label: 'Kalender' },
     { key: 'tasks', label: 'Aufgaben' },
@@ -13,7 +14,6 @@ const PlanenHub = {
 
   async render() {
     const wrap = App.el('div');
-    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('planen', { animate: true }); }));
     const node = await this.viewFor(this.activeTab).render();
     wrap.appendChild(node);
     return wrap;
@@ -22,6 +22,7 @@ const PlanenHub = {
 
 const FitnessHub = {
   activeTab: 'uebersicht',
+  tabIcons: { uebersicht: 'bolt', workouts: 'fitness', exercises: 'weight', progress: 'trophy' },
   tabs: [
     { key: 'uebersicht', label: 'Übersicht' },
     { key: 'workouts', label: 'Workouts' },
@@ -31,7 +32,6 @@ const FitnessHub = {
 
   async render() {
     const wrap = App.el('div');
-    wrap.appendChild(App.tabBar(this.tabs, this.activeTab, (key) => { this.activeTab = key; App.navigate('fitness', { animate: true }); }));
 
     let node;
     if (this.activeTab === 'uebersicht') {

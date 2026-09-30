@@ -5,6 +5,7 @@ Persönlicher Planer, Fokus-Timer und Fitness-Tracker in einer App. Läuft als P
 ## Bereiche
 
 - **Heute:** „Jetzt“-Karte (aktueller/nächster Block, Vorschlag für freie Zeit), Aufgaben, Gewohnheiten, Fortschritt.
+- **Navigation:** Die untere Leiste zeigt im Bereich Planen bzw. Fitness dessen Tabs; „Menü“ links führt zurück zu Heute/Planen/Fitness.
 - **Planen:** Kalender (Tag, Woche, Monat, Jahr), Aufgaben mit Unteraufgaben und Wiederholung, Notizen, Routinen mit Zeitfenster, Fokus-Timer mit Härtegraden.
 - **Fitness:** Workouts, Übungen, Fortschritt, Körperwerte.
 
